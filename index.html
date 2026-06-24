@@ -153,7 +153,7 @@ button{font-family:inherit; cursor:pointer;}
   width:100%; aspect-ratio:4/3; overflow:hidden; border-radius:1px; position:relative;
   background:#ddd; display:flex; align-items:center; justify-content:center;
 }
-.frame-media img, .frame-media video{width:100%; height:100%; object-fit:cover; display:block;}
+.frame-media img{width:100%; height:100%; object-fit:cover; display:block;}
 .frame-media .placeholder-icon{
   position:absolute; font-size:2.4rem; opacity:0.55; color:#fff; filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));
 }
@@ -191,7 +191,7 @@ button{font-family:inherit; cursor:pointer;}
   width:100%; max-height:60vh; background:#111; display:flex; align-items:center; justify-content:center;
   border-radius:var(--radius) var(--radius) 0 0; overflow:hidden;
 }
-.modal-media img,.modal-media video{width:100%; max-height:60vh; object-fit:contain; display:block;}
+.modal-media img{width:100%; max-height:60vh; object-fit:contain; display:block;}
 .modal-media .placeholder-icon{font-size:4rem; color:#fff; opacity:0.5;}
 .modal-body{padding:24px 26px 30px;}
 .modal-title{font-size:1.5rem; font-weight:700; margin:0 0 4px;}
@@ -236,14 +236,14 @@ button{font-family:inherit; cursor:pointer;}
 }
 .form-grid textarea{min-height:80px; resize:vertical;}
 .preview-box{width:140px; height:105px; border-radius:8px; overflow:hidden; background:#ddd; display:flex; align-items:center; justify-content:center; margin-top:6px;}
-.preview-box img,.preview-box video{width:100%; height:100%; object-fit:cover;}
+.preview-box img{width:100%; height:100%; object-fit:cover;}
 .file-warning{font-size:0.78rem; color:var(--brick-dark); margin-top:4px;}
 .admin-list-item{
   display:flex; gap:14px; align-items:center; padding:12px; border-radius:10px; background:#fff;
   border:1px solid rgba(0,0,0,0.07); margin-bottom:10px; flex-wrap:wrap;
 }
 .admin-thumb{width:64px; height:48px; border-radius:6px; overflow:hidden; background:#ccc; flex-shrink:0;}
-.admin-thumb img,.admin-thumb video{width:100%; height:100%; object-fit:cover;}
+.admin-thumb img{width:100%; height:100%; object-fit:cover;}
 .admin-list-info{flex:1; min-width:140px;}
 .admin-list-info b{font-size:0.95rem;}
 .admin-list-info span{display:block; font-size:0.78rem; color:var(--ink-soft);}
@@ -327,7 +327,10 @@ button{font-family:inherit; cursor:pointer;}
 <div id="screen-gallery" class="hidden">
   <div class="gallery-header">
     <div class="gallery-header-top">
-      <h2 class="gallery-title">🖼 우리 반 온라인 전시회</h2>
+      <div>
+        <h2 class="gallery-title">🖼 우리 반 온라인 전시회</h2>
+        <div id="gallery-collection-badge" style="font-size:0.78rem; color:var(--brass-dark); font-weight:700; margin-top:2px;"></div>
+      </div>
       <div class="gallery-header-actions">
         <button class="btn btn-ghost btn-small" onclick="goEntrance()">처음으로</button>
         <button class="btn btn-brass btn-small" onclick="enter3D()">🚶 3D로 보기</button>
@@ -339,7 +342,6 @@ button{font-family:inherit; cursor:pointer;}
       <button class="filter-chip active" data-type="all" onclick="setFilter('all')">전체</button>
       <button class="filter-chip" data-type="photo" onclick="setFilter('photo')">사진</button>
       <button class="filter-chip" data-type="painting" onclick="setFilter('painting')">그림</button>
-      <button class="filter-chip" data-type="video" onclick="setFilter('video')">동영상</button>
     </div>
   </div>
   <div class="gallery-grid" id="gallery-grid"></div>
@@ -421,7 +423,6 @@ button{font-family:inherit; cursor:pointer;}
         <select id="f-type">
           <option value="photo">사진</option>
           <option value="painting">그림</option>
-          <option value="video">동영상</option>
         </select>
       </div>
       <div>
@@ -429,10 +430,10 @@ button{font-family:inherit; cursor:pointer;}
         <textarea id="f-desc" maxlength="300" placeholder="작품에 대한 설명을 적어주세요"></textarea>
       </div>
       <div>
-        <label>파일 첨부 (이미지 또는 동영상)</label>
-        <input type="file" id="f-file" accept="image/*,video/*" onchange="handleFilePreview(event)">
+        <label>파일 첨부 (이미지)</label>
+        <input type="file" id="f-file" accept="image/*" onchange="handleFilePreview(event)">
         <div class="preview-box" id="file-preview-box">미리보기</div>
-        <div class="file-warning">⚠️ 동영상은 큰 파일을 올리면 브라우저 저장 용량 초과로 저장이 안 될 수 있어요. 짧고 작은 영상으로 테스트해주세요.</div>
+        <div class="file-warning">⚠️ 이미지 용량이 너무 크면 브라우저 저장 용량 초과로 저장이 안 될 수 있어요. 너무 큰 사진은 줄여서 올려주세요.</div>
       </div>
       <div style="display:flex; gap:10px;">
         <button class="btn btn-primary" onclick="saveArtworkForm()">저장하기</button>
@@ -444,6 +445,28 @@ button{font-family:inherit; cursor:pointer;}
   <div class="admin-section">
     <h2>🗂 작품 목록 관리</h2>
     <div id="admin-artwork-list"></div>
+  </div>
+
+  <div class="admin-section">
+    <h2>📚 전시회 묶음 관리</h2>
+    <p style="font-size:0.85rem; color:var(--ink-soft); margin-top:-6px;">작품을 "고전 명화", "우리반 미술 작품"처럼 묶어두고, 관람객에게는 그중 하나만 골라서 보여줄 수 있어요.</p>
+    <div id="active-collection-info" style="margin:12px 0 14px; font-size:0.9rem;"></div>
+    <div id="collection-list"></div>
+    <button class="btn btn-primary" style="margin-top:12px;" onclick="openCollectionForm()">➕ 새 묶음 만들기</button>
+
+    <div id="collection-form-box" class="hidden" style="margin-top:18px; border-top:2px dashed rgba(156,122,63,0.35); padding-top:16px;">
+      <h3 id="collection-form-title" style="margin:0 0 10px; font-size:1rem;">새 묶음 만들기</h3>
+      <input type="hidden" id="collection-edit-id">
+      <label style="font-size:0.85rem; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:4px;">묶음 이름</label>
+      <input type="text" id="collection-name-input" maxlength="30" placeholder="예) 고전 명화 묶음"
+        style="width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin-bottom:14px;">
+      <label style="font-size:0.85rem; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:6px;">포함할 작품 선택</label>
+      <div id="collection-checklist" style="display:grid; gap:8px; max-height:280px; overflow-y:auto; padding:4px;"></div>
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="btn btn-primary" onclick="saveCollectionForm()">묶음 저장</button>
+        <button class="btn btn-ghost" onclick="closeCollectionForm()">취소</button>
+      </div>
+    </div>
   </div>
 
   <div class="admin-section">
@@ -500,6 +523,7 @@ const KEY_VIEWED_IDS = "GAL_VIEWED_IDS";
 let currentFilter = "all";
 let currentDetailId = null;
 let pendingFileData = null; // 파일 첨부 미리보기에서 base64로 변환된 값 임시 저장
+let pendingAspectRatio = null; // 업로드한 이미지의 가로/세로 비율 (액자 모양에 사용)
 
 /* ---------------------------------------------------------
    ▶▶ Firebase 설정 ◀◀
@@ -526,6 +550,8 @@ let hasCheckedSeed = false;
 let cachedArtworks = {};  // { id: {...} }
 let cachedComments = {};  // { artworkId: { commentId: {...} } }
 let cachedViews = {};     // { artworkId: number }
+let cachedCollections = {};      // { collectionId: {name, artworkIds:{id:true,...}, createdAt} }
+let cachedActiveCollectionId = null; // 지금 관람객에게 보이는 묶음 id (null이면 전체 작품)
 
 function initFirebase(){
   const filled = firebaseConfig.databaseURL && !firebaseConfig.databaseURL.includes("여기에-");
@@ -581,10 +607,27 @@ function attachListeners(){
     cachedViews = snap.val() || {};
     refreshCurrentScreen();
   });
+
+  db.ref("collections").on("value", snap=>{
+    cachedCollections = snap.val() || {};
+    refreshCurrentScreen();
+  });
+
+  db.ref("activeCollectionId").on("value", snap=>{
+    cachedActiveCollectionId = snap.val() || null;
+    refreshCurrentScreen();
+  });
 }
 
 function getArtworksArray(){
   return Object.keys(cachedArtworks).map(id=> Object.assign({id}, cachedArtworks[id]));
+}
+// 지금 적용된 묶음이 있으면 그 작품들만, 없으면 전체 작품을 반환 (관람객 화면 / 3D 전시관에서 사용)
+function getVisibleArtworks(){
+  const all = getArtworksArray();
+  if(!cachedActiveCollectionId || !cachedCollections[cachedActiveCollectionId]) return all;
+  const ids = cachedCollections[cachedActiveCollectionId].artworkIds || {};
+  return all.filter(a=> ids[a.id]);
 }
 function getCommentsArray(artworkId){
   const node = cachedComments[artworkId];
@@ -598,6 +641,7 @@ function refreshCurrentScreen(){
   }
   if(!document.getElementById("screen-admin").classList.contains("hidden")){
     renderAdminList();
+    renderCollectionList();
   }
   if(!document.getElementById("screen-3d").classList.contains("hidden") && threeRenderer){
     buildGalleryScene();
@@ -633,7 +677,7 @@ function formatTime(ts){
     " " + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
 }
 function typeLabel(type){
-  return type === "photo" ? "사진" : type === "painting" ? "그림" : "동영상";
+  return type === "photo" ? "사진" : "그림";
 }
 let toastTimer = null;
 function showToast(msg){
@@ -653,17 +697,19 @@ function seedDefaultArtworks(){
   const seedObj = {
     [id1]: {title:"봄날의 학교", artist:"김OO", type:"photo",
       desc:"학교 운동장에 핀 꽃을 찍은 사진입니다.",
-      fileData:null, thumbGradient:"linear-gradient(135deg,#F6C667,#E89A4E)", createdAt: Date.now()-300000},
+      fileData:null, thumbGradient:"linear-gradient(135deg,#F6C667,#E89A4E)", aspectRatio:1.33, createdAt: Date.now()-300000},
     [id2]: {title:"상상의 동물", artist:"이OO", type:"painting",
       desc:"내가 상상한 새로운 동물을 그린 작품입니다.",
-      fileData:null, thumbGradient:"linear-gradient(135deg,#7FB7A6,#4F8C8B)", createdAt: Date.now()-200000},
-    [id3]: {title:"우리 반 하루", artist:"박OO", type:"video",
-      desc:"우리 반의 하루를 짧은 영상으로 표현한 작품입니다.",
-      fileData:null, thumbGradient:"linear-gradient(135deg,#9C8BC9,#5E5A9C)", createdAt: Date.now()-100000}
+      fileData:null, thumbGradient:"linear-gradient(135deg,#7FB7A6,#4F8C8B)", aspectRatio:0.8, createdAt: Date.now()-200000},
+    [id3]: {title:"운동회 날", artist:"박OO", type:"photo",
+      desc:"우리 반 운동회 날의 신나는 순간을 담은 사진입니다.",
+      fileData:null, thumbGradient:"linear-gradient(135deg,#9C8BC9,#5E5A9C)", aspectRatio:1.5, createdAt: Date.now()-100000}
   };
   db.ref("artworks").set(seedObj);
   db.ref("comments").set(null);
   db.ref("views").set(null);
+  db.ref("collections").set(null);
+  db.ref("activeCollectionId").set(null);
 }
 function seedIfEmptyOnce(){
   if(hasCheckedSeed) return;
@@ -706,8 +752,17 @@ function setFilter(type){
 
 function renderGallery(){
   const grid = document.getElementById("gallery-grid");
-  const artworks = getArtworksArray();
+  const artworks = getVisibleArtworks();
   const searchTerm = (document.getElementById("search-input").value || "").trim().toLowerCase();
+
+  const badge = document.getElementById("gallery-collection-badge");
+  if(badge){
+    if(cachedActiveCollectionId && cachedCollections[cachedActiveCollectionId]){
+      badge.textContent = "📌 지금 보고 있는 묶음: " + cachedCollections[cachedActiveCollectionId].name;
+    }else{
+      badge.textContent = "";
+    }
+  }
 
   if(!FIREBASE_CONFIGURED){
     grid.innerHTML = '<div class="empty-msg">⚠️ Firebase 설정이 필요해요. 코드 상단의 firebaseConfig 값을 채워주세요.</div>';
@@ -733,20 +788,19 @@ function renderGallery(){
   grid.innerHTML = filtered.map(a=>{
     const cCount = getCommentsArray(a.id).length;
     const vCount = cachedViews[a.id] || 0;
+    const ar = a.aspectRatio && a.aspectRatio > 0 ? a.aspectRatio : (4/3);
     let mediaHtml;
-    if(a.fileData && a.type === "video"){
-      mediaHtml = `<video muted></video><div class="placeholder-icon">▶️</div>`;
-    }else if(a.fileData){
+    if(a.fileData){
       mediaHtml = `<img src="${a.fileData}" alt="${escapeHtml(a.title)}">`;
     }else{
-      const icon = a.type === "video" ? "🎬" : a.type === "painting" ? "🎨" : "📷";
+      const icon = a.type === "painting" ? "🎨" : "📷";
       mediaHtml = `<div style="position:absolute;inset:0;background:${a.thumbGradient || 'linear-gradient(135deg,#ccc,#999)'}"></div><div class="placeholder-icon">${icon}</div>`;
     }
     return `
       <div class="artwork-frame" onclick="openDetail('${a.id}')">
         <div class="frame-outer">
           <div class="frame-mat">
-            <div class="frame-media">
+            <div class="frame-media" style="aspect-ratio:${ar};">
               ${mediaHtml}
               <span class="type-badge">${typeLabel(a.type)}</span>
             </div>
@@ -770,14 +824,14 @@ function openDetail(id){
   if(!a) return;
   currentDetailId = id;
 
+  const ar = a.aspectRatio && a.aspectRatio > 0 ? a.aspectRatio : (4/3);
   const mediaBox = document.getElementById("modal-media");
-  if(a.fileData && a.type === "video"){
-    mediaBox.innerHTML = `<video src="${a.fileData}" controls></video>`;
-  }else if(a.fileData){
+  mediaBox.style.aspectRatio = ar;
+  if(a.fileData){
     mediaBox.innerHTML = `<img src="${a.fileData}" alt="${escapeHtml(a.title)}">`;
   }else{
-    const icon = a.type === "video" ? "🎬" : a.type === "painting" ? "🎨" : "📷";
-    mediaBox.innerHTML = `<div style="width:100%;height:260px;background:${a.thumbGradient || 'linear-gradient(135deg,#ccc,#999)'};display:flex;align-items:center;justify-content:center;"><span class="placeholder-icon">${icon}</span></div>`;
+    const icon = a.type === "painting" ? "🎨" : "📷";
+    mediaBox.innerHTML = `<div style="width:100%;height:100%;background:${a.thumbGradient || 'linear-gradient(135deg,#ccc,#999)'};display:flex;align-items:center;justify-content:center;"><span class="placeholder-icon">${icon}</span></div>`;
   }
 
   document.getElementById("modal-title").textContent = a.title;
@@ -889,6 +943,7 @@ function checkAdminPassword(){
     show("screen-admin");
     resetForm();
     renderAdminList();
+    renderCollectionList();
   }else{
     document.getElementById("admin-login-error").textContent = "비밀번호가 올바르지 않습니다.";
   }
@@ -901,24 +956,32 @@ function handleFilePreview(e){
   const file = e.target.files[0];
   const previewBox = document.getElementById("file-preview-box");
   pendingFileData = null;
+  pendingAspectRatio = null;
   if(!file) { previewBox.innerHTML = "미리보기"; return; }
 
+  if(!file.type.startsWith("image/")){
+    showToast("⚠️ 이미지 파일만 올릴 수 있어요.");
+    e.target.value = "";
+    return;
+  }
+
   const sizeMB = file.size / (1024*1024);
-  if(file.type.startsWith("video/") && sizeMB > 5){
-    showToast("⚠️ 동영상 용량이 커서(약 " + sizeMB.toFixed(1) + "MB) Firebase 저장이 안 될 수 있어요. 짧은 영상을 권장해요.");
-  }else if(file.type.startsWith("image/") && sizeMB > 3){
+  if(sizeMB > 3){
     showToast("⚠️ 이미지 용량이 커서(약 " + sizeMB.toFixed(1) + "MB) 저장에 실패할 수 있어요.");
   }
 
   const reader = new FileReader();
   reader.onload = function(ev){
     pendingFileData = ev.target.result;
-    if(file.type.startsWith("video/")){
-      previewBox.innerHTML = `<video src="${pendingFileData}" muted></video>`;
-    }else{
-      previewBox.innerHTML = `<img src="${pendingFileData}">`;
-    }
-    if(file.type.startsWith("video/")) document.getElementById("f-type").value = "video";
+    previewBox.innerHTML = `<img src="${pendingFileData}">`;
+    // 업로드한 사진의 가로세로 비율을 읽어서 액자 모양을 그 비율에 맞춥니다.
+    const img = new Image();
+    img.onload = function(){
+      if(img.naturalWidth > 0 && img.naturalHeight > 0){
+        pendingAspectRatio = img.naturalWidth / img.naturalHeight;
+      }
+    };
+    img.src = pendingFileData;
   };
   reader.onerror = function(){
     showToast("⚠️ 파일을 읽는 중 문제가 발생했어요. 다른 파일로 시도해주세요.");
@@ -937,6 +1000,7 @@ function resetForm(){
   document.getElementById("form-title").textContent = "➕ 새 작품 추가";
   document.getElementById("cancel-edit-btn").classList.add("hidden");
   pendingFileData = null;
+  pendingAspectRatio = null;
 }
 
 function saveArtworkForm(){
@@ -956,6 +1020,7 @@ function saveArtworkForm(){
     // 수정
     const updateObj = { title, artist, type, desc };
     if(pendingFileData) updateObj.fileData = pendingFileData;
+    if(pendingAspectRatio) updateObj.aspectRatio = pendingAspectRatio;
     db.ref("artworks/" + id).update(updateObj)
       .then(()=>{
         showToast("작품이 수정되었습니다 ✏️");
@@ -969,6 +1034,7 @@ function saveArtworkForm(){
     const newArt = {
       title, artist, type, desc,
       fileData: pendingFileData || null,
+      aspectRatio: pendingAspectRatio || null,
       thumbGradient: "linear-gradient(135deg,#B7A6D6,#7C6BA0)",
       createdAt: Date.now()
     };
@@ -992,9 +1058,10 @@ function startEditArtwork(id){
   document.getElementById("f-desc").value = a.desc;
   document.getElementById("f-file").value = "";
   pendingFileData = null;
+  pendingAspectRatio = null;
   const previewBox = document.getElementById("file-preview-box");
   if(a.fileData){
-    previewBox.innerHTML = a.type === "video" ? `<video src="${a.fileData}" muted></video>` : `<img src="${a.fileData}">`;
+    previewBox.innerHTML = `<img src="${a.fileData}">`;
   }else{
     previewBox.innerHTML = "미리보기 (현재 파일 없음)";
   }
@@ -1037,9 +1104,7 @@ function renderAdminList(){
   box.innerHTML = artworks.map(a=>{
     const cList = getCommentsArray(a.id);
     let thumb;
-    if(a.fileData && a.type === "video"){
-      thumb = `<video src="${a.fileData}" muted></video>`;
-    }else if(a.fileData){
+    if(a.fileData){
       thumb = `<img src="${a.fileData}">`;
     }else{
       thumb = `<div style="width:100%;height:100%;background:${a.thumbGradient || '#ccc'};"></div>`;
@@ -1084,6 +1149,138 @@ function deleteComment(artworkId, commentId){
 }
 
 /* ---------------------------------------------------------
+   관리자: 전시회 묶음(컬렉션) 관리
+   - 작품을 묶음으로 묶어두고, 그중 하나를 "적용"하면
+     관람객(2D 갤러리·3D 전시관)에게 그 묶음만 보여줍니다.
+   --------------------------------------------------------- */
+function renderCollectionList(){
+  const box = document.getElementById("collection-list");
+  const infoBox = document.getElementById("active-collection-info");
+  if(!box || !infoBox) return;
+
+  if(cachedActiveCollectionId && cachedCollections[cachedActiveCollectionId]){
+    infoBox.innerHTML = `지금 관람객에게 <b>${escapeHtml(cachedCollections[cachedActiveCollectionId].name)}</b> 묶음이 보이고 있어요. `
+      + `<button class="btn btn-ghost btn-small" onclick="clearActiveCollection()">전체 작품으로 보기</button>`;
+  }else{
+    infoBox.innerHTML = "지금 관람객에게 <b>전체 작품</b>이 보이고 있어요.";
+  }
+
+  const ids = Object.keys(cachedCollections);
+  if(ids.length === 0){
+    box.innerHTML = '<div class="no-comments">아직 만든 묶음이 없어요. "새 묶음 만들기"로 시작해보세요.</div>';
+    return;
+  }
+
+  box.innerHTML = ids.map(id=>{
+    const col = cachedCollections[id];
+    const count = Object.keys(col.artworkIds || {}).length;
+    const isActive = cachedActiveCollectionId === id;
+    return `
+      <div class="admin-list-item">
+        <div class="admin-list-info">
+          <b>${escapeHtml(col.name)}</b>
+          <span>작품 ${count}개${isActive ? " · 적용 중" : ""}</span>
+        </div>
+        <div class="admin-list-actions">
+          ${isActive
+            ? '<button class="btn btn-ghost btn-small" disabled style="opacity:0.6;">✅ 적용 중</button>'
+            : `<button class="btn btn-brass btn-small" onclick="applyCollection('${id}')">적용하기</button>`}
+          <button class="btn btn-ghost btn-small" onclick="openCollectionForm('${id}')">수정</button>
+          <button class="btn btn-danger btn-small" onclick="deleteCollection('${id}')">삭제</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderCollectionChecklist(selectedIds){
+  const box = document.getElementById("collection-checklist");
+  const artworks = getArtworksArray().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  if(artworks.length === 0){
+    box.innerHTML = '<div class="no-comments">등록된 작품이 없어요. 먼저 작품을 추가해주세요.</div>';
+    return;
+  }
+  box.innerHTML = artworks.map(a=>`
+    <label style="display:flex; align-items:center; gap:10px; background:#fff; border:1px solid rgba(0,0,0,0.08); border-radius:10px; padding:9px 12px; cursor:pointer;">
+      <input type="checkbox" class="collection-check" value="${a.id}" ${selectedIds[a.id] ? "checked" : ""} style="width:18px; height:18px;">
+      <span style="font-size:0.88rem;">${escapeHtml(a.title)} <span style="color:var(--ink-soft); font-size:0.78rem;">· ${escapeHtml(a.artist)} · ${typeLabel(a.type)}</span></span>
+    </label>
+  `).join("");
+}
+
+function openCollectionForm(id){
+  document.getElementById("collection-form-box").classList.remove("hidden");
+  document.getElementById("collection-edit-id").value = id || "";
+  let selected = {};
+  if(id && cachedCollections[id]){
+    document.getElementById("collection-name-input").value = cachedCollections[id].name || "";
+    selected = cachedCollections[id].artworkIds || {};
+    document.getElementById("collection-form-title").textContent = "✏️ 묶음 수정";
+  }else{
+    document.getElementById("collection-name-input").value = "";
+    document.getElementById("collection-form-title").textContent = "➕ 새 묶음 만들기";
+  }
+  renderCollectionChecklist(selected);
+  document.getElementById("collection-form-box").scrollIntoView({behavior:"smooth", block:"center"});
+}
+
+function closeCollectionForm(){
+  document.getElementById("collection-form-box").classList.add("hidden");
+}
+
+function saveCollectionForm(){
+  if(!requireDb()) return;
+  const existingId = document.getElementById("collection-edit-id").value;
+  const id = existingId || generateId();
+  const name = document.getElementById("collection-name-input").value.trim();
+  if(!name){
+    showToast("묶음 이름을 입력해주세요.");
+    return;
+  }
+  const checks = document.querySelectorAll(".collection-check:checked");
+  if(checks.length === 0){
+    showToast("최소 1개 이상의 작품을 선택해주세요.");
+    return;
+  }
+  const artworkIds = {};
+  checks.forEach(c=> artworkIds[c.value] = true);
+
+  db.ref("collections/" + id).set({ name, artworkIds, createdAt: Date.now() })
+    .then(()=>{
+      showToast("묶음이 저장되었습니다 🗂");
+      closeCollectionForm();
+      renderCollectionList();
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 저장 중 오류가 발생했어요."); });
+}
+
+function applyCollection(id){
+  if(!requireDb()) return;
+  db.ref("activeCollectionId").set(id)
+    .then(()=> showToast("묶음이 적용되었습니다 ✅ (관람객 화면에 바로 반영돼요)"))
+    .catch(err=>{ console.error(err); showToast("⚠️ 적용 중 오류가 발생했어요."); });
+}
+
+function clearActiveCollection(){
+  if(!requireDb()) return;
+  db.ref("activeCollectionId").set(null)
+    .then(()=> showToast("전체 작품 보기로 전환했어요."))
+    .catch(err=>{ console.error(err); showToast("⚠️ 전환 중 오류가 발생했어요."); });
+}
+
+function deleteCollection(id){
+  if(!requireDb()) return;
+  if(!confirm("이 묶음을 삭제하시겠습니까?\n(묶음만 사라지고, 포함된 작품은 삭제되지 않아요)")) return;
+  db.ref("collections/" + id).remove()
+    .then(()=>{
+      if(cachedActiveCollectionId === id) db.ref("activeCollectionId").set(null);
+      showToast("묶음이 삭제되었습니다.");
+      renderCollectionList();
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 삭제 중 오류가 발생했어요."); });
+}
+
+/* ---------------------------------------------------------
    관리자: 데이터 내보내기 / 가져오기 / 전체 초기화
    --------------------------------------------------------- */
 function exportData(){
@@ -1091,6 +1288,8 @@ function exportData(){
     artworks: cachedArtworks,
     comments: cachedComments,
     views: cachedViews,
+    collections: cachedCollections,
+    activeCollectionId: cachedActiveCollectionId,
     exportedAt: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
@@ -1144,10 +1343,13 @@ function importData(e){
       if(!data.artworks){ throw new Error("형식이 올바르지 않습니다."); }
       const artworksObj = normalizeImportedArtworks(data.artworks);
       const commentsObj = normalizeImportedComments(data.comments || {});
+      const collectionsObj = data.collections || {};
       Promise.all([
         db.ref("artworks").set(artworksObj),
         db.ref("comments").set(Object.keys(commentsObj).length ? commentsObj : null),
-        db.ref("views").set(data.views && Object.keys(data.views).length ? data.views : null)
+        db.ref("views").set(data.views && Object.keys(data.views).length ? data.views : null),
+        db.ref("collections").set(Object.keys(collectionsObj).length ? collectionsObj : null),
+        db.ref("activeCollectionId").set(data.activeCollectionId || null)
       ]).then(()=>{
         showToast("데이터를 가져왔습니다 ✅");
       }).catch(err=>{
@@ -1253,7 +1455,7 @@ function buildGalleryScene(){
   threeGalleryGroup = new THREE.Group();
   interactiveMeshes = [];
 
-  const artworks = getArtworksArray().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const artworks = getVisibleArtworks().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
   const spacing = 5;
   roomLength = Math.max(20, 4 + Math.ceil(Math.max(artworks.length,1)/2) * spacing + 4);
 
@@ -1314,25 +1516,26 @@ function disposeGroup(group){
 
 function createFrameMesh(art, x, z, rotY){
   const group = new THREE.Group();
+  const dims = getFrameDims(art);
 
   const frameMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(2.2, 1.7, 0.12),
+    new THREE.BoxGeometry(dims.w + 0.3, dims.h + 0.3, 0.12),
     new THREE.MeshStandardMaterial({color:0x9C7A3F})
   );
   group.add(frameMesh);
 
   const artMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.9, 1.4),
+    new THREE.PlaneGeometry(dims.w, dims.h),
     new THREE.MeshBasicMaterial({map: buildArtworkTexture(art)})
   );
   artMesh.position.z = 0.07;
   group.add(artMesh);
 
   const plaqueMesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.6, 0.32),
+    new THREE.PlaneGeometry(Math.min(1.6, dims.w + 0.2), 0.32),
     new THREE.MeshBasicMaterial({map: buildPlaqueTexture(art)})
   );
-  plaqueMesh.position.set(0, -1.05, 0.07);
+  plaqueMesh.position.set(0, -(dims.h/2 + 0.35), 0.07);
   group.add(plaqueMesh);
 
   group.position.set(x, 1.75, z);
@@ -1343,6 +1546,18 @@ function createFrameMesh(art, x, z, rotY){
   return group;
 }
 
+// 작품의 실제 가로/세로 비율에 맞춰 액자(평면) 크기를 계산합니다.
+function getFrameDims(art, baseLongSide){
+  baseLongSide = baseLongSide || 1.9;
+  const ar = art.aspectRatio && art.aspectRatio > 0 ? art.aspectRatio : (4/3);
+  let w, h;
+  if(ar >= 1){ w = baseLongSide; h = baseLongSide / ar; }
+  else { h = baseLongSide; w = baseLongSide * ar; }
+  w = Math.max(0.9, Math.min(2.3, w));
+  h = Math.max(0.9, Math.min(2.3, h));
+  return {w, h};
+}
+
 function extractGradientColors(gradStr){
   const matches = gradStr ? gradStr.match(/#[0-9A-Fa-f]{6}/g) : null;
   if(!matches || matches.length < 2) return ["#cccccc", "#999999"];
@@ -1350,14 +1565,17 @@ function extractGradientColors(gradStr){
 }
 
 function buildArtworkTexture(art){
+  const ar = art.aspectRatio && art.aspectRatio > 0 ? art.aspectRatio : (4/3);
+  const base = 256;
   const canvas = document.createElement("canvas");
-  canvas.width = 256; canvas.height = 192;
+  if(ar >= 1){ canvas.width = base; canvas.height = Math.round(base / ar); }
+  else { canvas.height = base; canvas.width = Math.round(base * ar); }
   const ctx = canvas.getContext("2d");
   drawArtPlaceholder(ctx, art, canvas.width, canvas.height);
   const texture = new THREE.CanvasTexture(canvas);
 
-  // 실제 이미지 파일이 있으면(동영상 제외) 비동기로 그려서 텍스처를 교체
-  if(art.fileData && art.type !== "video"){
+  // 실제 이미지 파일이 있으면 비동기로 그려서 텍스처를 교체
+  if(art.fileData){
     const img = new Image();
     img.onload = function(){
       ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -1377,10 +1595,10 @@ function drawArtPlaceholder(ctx, art, w, h){
   grad.addColorStop(1, colors[1]);
   ctx.fillStyle = grad;
   ctx.fillRect(0,0,w,h);
-  ctx.font = "70px sans-serif";
+  ctx.font = Math.round(Math.min(w,h) * 0.4) + "px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  const icon = art.type === "video" ? "🎬" : art.type === "painting" ? "🎨" : "📷";
+  const icon = art.type === "painting" ? "🎨" : "📷";
   ctx.fillText(icon, w/2, h/2);
 }
 
