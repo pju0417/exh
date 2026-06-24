@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>우리 반 온라인 전시회</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- Firebase (compat SDK: 빌드 도구 없이 <script> 태그로 바로 사용) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+/* =========================================================
+   디자인 토큰 (색상 / 타이포그래피)
+   - wall   : 전시장 벽면 색
+   - paper  : 카드/모달 배경(매트보드)
+   - brass  : 액자 테두리, 강조색
+   - ink    : 기본 텍스트
+   - moss   : 보조 강조(버튼)
+   - brick  : 경고/삭제 강조
+   ========================================================= */
+:root{
+  --wall:#ECE6D8;
+  --wall-deep:#E2DAC8;
+  --paper:#FAF7EF;
+  --brass:#9C7A3F;
+  --brass-dark:#7A5E2E;
+  --ink:#211F1C;
+  --ink-soft:#5B564C;
+  --moss:#4B5842;
+  --moss-dark:#3A4533;
+  --brick:#8B4A43;
+  --brick-dark:#6E3A35;
+  --shadow:0 10px 30px rgba(33,31,28,0.18);
+  --radius:14px;
+  font-size:16px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Noto Sans KR', sans-serif;
+  color:var(--ink);
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.015) 0 2px, transparent 2px 64px),
+    linear-gradient(180deg, var(--wall) 0%, var(--wall-deep) 100%);
+  min-height:100vh;
+}
+h1,h2,h3{font-family:'Noto Serif KR', serif;}
+button{font-family:inherit; cursor:pointer;}
+.hidden{display:none !important;}
+
+/* ---------- 공통 버튼 ---------- */
+.btn{
+  border:none; border-radius:999px; padding:14px 28px; font-size:1rem; font-weight:700;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:var(--moss); color:#fff; box-shadow:0 6px 16px rgba(75,88,66,0.35);}
+.btn-primary:hover{background:var(--moss-dark);}
+.btn-brass{background:var(--brass); color:#fff; box-shadow:0 6px 16px rgba(156,122,63,0.35);}
+.btn-brass:hover{background:var(--brass-dark);}
+.btn-ghost{background:transparent; color:var(--ink); border:2px solid var(--ink-soft);}
+.btn-ghost:hover{background:rgba(0,0,0,0.05);}
+.btn-danger{background:var(--brick); color:#fff;}
+.btn-danger:hover{background:var(--brick-dark);}
+.btn-small{padding:8px 16px; font-size:0.85rem; border-radius:999px;}
+.btn-block{width:100%;}
+
+/* ---------- 워터마크 ---------- */
+.watermark{
+  position:fixed; bottom:10px; right:14px; font-size:0.72rem; color:var(--ink-soft);
+  opacity:0.55; letter-spacing:0.03em; z-index:50; pointer-events:none;
+}
+
+/* =========================================================
+   1) 입장 화면
+   ========================================================= */
+#screen-entrance{
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+  flex-direction:column; text-align:center; padding:40px 20px;
+}
+.entrance-card{
+  background:var(--paper); border-radius:var(--radius); padding:56px 40px;
+  box-shadow:var(--shadow); max-width:560px; width:100%;
+  border:1px solid rgba(156,122,63,0.25);
+}
+.entrance-eyebrow{
+  font-size:0.78rem; letter-spacing:0.18em; color:var(--brass-dark); font-weight:700;
+}
+.entrance-card h1{
+  font-size:2.1rem; margin:14px 0 10px; color:var(--ink); font-weight:700;
+}
+.entrance-divider{
+  width:64px; height:3px; background:var(--brass); margin:18px auto 22px; border-radius:2px;
+}
+.entrance-desc{font-size:1.02rem; color:var(--ink-soft); line-height:1.6; margin-bottom:34px;}
+.entrance-actions{display:flex; flex-direction:column; gap:12px;}
+.entrance-actions .btn-ghost{font-size:0.85rem; padding:10px 22px;}
+
+/* =========================================================
+   2) 갤러리 홀
+   ========================================================= */
+#screen-gallery{padding:0 0 80px;}
+.gallery-header{
+  position:sticky; top:0; z-index:30; background:rgba(236,230,216,0.92);
+  backdrop-filter:blur(6px); padding:18px 20px 14px; border-bottom:2px solid rgba(156,122,63,0.25);
+}
+.gallery-header-top{
+  display:flex; justify-content:space-between; align-items:center; max-width:1100px; margin:0 auto 12px;
+  flex-wrap:wrap; gap:10px;
+}
+.gallery-title{font-size:1.4rem; font-weight:700; color:var(--ink); margin:0;}
+.gallery-header-actions{display:flex; gap:8px;}
+.gallery-toolbar{
+  max-width:1100px; margin:0 auto; display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+}
+#search-input{
+  flex:1; min-width:160px; padding:11px 16px; border-radius:999px; border:2px solid rgba(156,122,63,0.3);
+  font-size:0.95rem; background:#fff;
+}
+#search-input:focus{outline:none; border-color:var(--brass);}
+.filter-chip{
+  border:2px solid rgba(156,122,63,0.35); background:#fff; color:var(--ink-soft);
+  padding:9px 16px; border-radius:999px; font-size:0.85rem; font-weight:700;
+}
+.filter-chip.active{background:var(--moss); color:#fff; border-color:var(--moss);}
+
+.gallery-grid{
+  max-width:1100px; margin:30px auto 0; padding:0 20px;
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:34px;
+}
+.empty-msg{
+  text-align:center; color:var(--ink-soft); padding:60px 20px; font-size:1rem; grid-column:1/-1;
+}
+
+/* ---------- 액자형 작품 카드 ---------- */
+.artwork-frame{
+  cursor:pointer; transition:transform .2s ease, box-shadow .2s ease;
+  display:flex; flex-direction:column; align-items:center;
+}
+.artwork-frame:hover{transform:translateY(-6px) scale(1.015);}
+.frame-outer{
+  width:100%; background:linear-gradient(145deg, var(--brass), var(--brass-dark));
+  padding:10px; border-radius:6px; box-shadow:0 14px 26px rgba(33,31,28,0.22);
+}
+.artwork-frame:hover .frame-outer{box-shadow:0 20px 34px rgba(33,31,28,0.3);}
+.frame-mat{
+  background:var(--paper); padding:12px; border-radius:2px;
+}
+.frame-media{
+  width:100%; aspect-ratio:4/3; overflow:hidden; border-radius:1px; position:relative;
+  background:#ddd; display:flex; align-items:center; justify-content:center;
+}
+.frame-media img, .frame-media video{width:100%; height:100%; object-fit:cover; display:block;}
+.frame-media .placeholder-icon{
+  position:absolute; font-size:2.4rem; opacity:0.55; color:#fff; filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));
+}
+.type-badge{
+  position:absolute; top:8px; left:8px; background:rgba(33,31,28,0.72); color:#fff;
+  font-size:0.7rem; padding:4px 9px; border-radius:999px; font-weight:700;
+}
+.plaque{
+  margin-top:14px; background:var(--ink); color:#EFE6CE; border-radius:6px;
+  padding:10px 16px; text-align:center; width:88%; box-shadow:0 6px 14px rgba(0,0,0,0.25);
+}
+.plaque .p-title{font-family:'Noto Serif KR',serif; font-weight:700; font-size:0.98rem;}
+.plaque .p-artist{font-size:0.78rem; color:#C9B98C; margin-top:2px;}
+.plaque .p-meta{
+  display:flex; justify-content:center; gap:12px; margin-top:6px; font-size:0.7rem; color:#B9AE92;
+}
+
+/* =========================================================
+   3) 상세 보기 모달
+   ========================================================= */
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(20,18,15,0.72); z-index:100;
+  display:flex; align-items:center; justify-content:center; padding:18px; overflow-y:auto;
+}
+.modal-box{
+  background:var(--paper); border-radius:var(--radius); max-width:760px; width:100%;
+  max-height:92vh; overflow-y:auto; box-shadow:0 24px 60px rgba(0,0,0,0.4); position:relative;
+}
+.modal-close{
+  position:absolute; top:14px; right:14px; background:var(--ink); color:#fff; border:none;
+  width:38px; height:38px; border-radius:50%; font-size:1.2rem; line-height:1; z-index:5;
+  box-shadow:0 4px 10px rgba(0,0,0,0.3);
+}
+.modal-media{
+  width:100%; max-height:60vh; background:#111; display:flex; align-items:center; justify-content:center;
+  border-radius:var(--radius) var(--radius) 0 0; overflow:hidden;
+}
+.modal-media img,.modal-media video{width:100%; max-height:60vh; object-fit:contain; display:block;}
+.modal-media .placeholder-icon{font-size:4rem; color:#fff; opacity:0.5;}
+.modal-body{padding:24px 26px 30px;}
+.modal-title{font-size:1.5rem; font-weight:700; margin:0 0 4px;}
+.modal-artist{color:var(--ink-soft); font-size:0.95rem; margin-bottom:14px;}
+.modal-tags{display:flex; gap:8px; margin-bottom:16px;}
+.tag{background:var(--moss); color:#fff; font-size:0.75rem; padding:4px 12px; border-radius:999px; font-weight:700;}
+.modal-desc{line-height:1.7; color:var(--ink); margin-bottom:18px; white-space:pre-wrap;}
+.appreciate-btn{display:inline-flex; align-items:center; gap:6px;}
+
+.comments-section{margin-top:24px; border-top:2px dashed rgba(156,122,63,0.35); padding-top:18px;}
+.comments-section h3{font-size:1.05rem; margin:0 0 12px;}
+.comment-item{
+  background:#fff; border-radius:10px; padding:12px 14px; margin-bottom:10px;
+  border:1px solid rgba(0,0,0,0.06);
+}
+.comment-top{display:flex; justify-content:space-between; font-size:0.85rem; font-weight:700;}
+.comment-time{color:var(--ink-soft); font-weight:400; font-size:0.75rem;}
+.comment-content{margin-top:4px; font-size:0.92rem; line-height:1.5;}
+.comment-form{display:flex; flex-direction:column; gap:8px; margin-top:14px;}
+.comment-form input, .comment-form textarea{
+  padding:10px 14px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); font-size:0.92rem;
+  font-family:inherit;
+}
+.comment-form textarea{resize:vertical; min-height:64px;}
+.no-comments{color:var(--ink-soft); font-size:0.88rem;}
+
+/* =========================================================
+   4) 관리자 모드
+   ========================================================= */
+#screen-admin{max-width:920px; margin:0 auto; padding:24px 20px 100px;}
+.admin-header{display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:20px;}
+.admin-section{
+  background:var(--paper); border-radius:var(--radius); padding:22px; margin-bottom:22px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.08);
+}
+.admin-section h2{margin:0 0 14px; font-size:1.15rem;}
+.form-grid{display:grid; gap:12px;}
+.form-grid label{font-size:0.85rem; font-weight:700; color:var(--ink-soft); margin-bottom:4px; display:block;}
+.form-grid input[type=text], .form-grid textarea, .form-grid select{
+  width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15);
+  font-size:0.93rem; font-family:inherit;
+}
+.form-grid textarea{min-height:80px; resize:vertical;}
+.preview-box{width:140px; height:105px; border-radius:8px; overflow:hidden; background:#ddd; display:flex; align-items:center; justify-content:center; margin-top:6px;}
+.preview-box img,.preview-box video{width:100%; height:100%; object-fit:cover;}
+.file-warning{font-size:0.78rem; color:var(--brick-dark); margin-top:4px;}
+.admin-list-item{
+  display:flex; gap:14px; align-items:center; padding:12px; border-radius:10px; background:#fff;
+  border:1px solid rgba(0,0,0,0.07); margin-bottom:10px; flex-wrap:wrap;
+}
+.admin-thumb{width:64px; height:48px; border-radius:6px; overflow:hidden; background:#ccc; flex-shrink:0;}
+.admin-thumb img,.admin-thumb video{width:100%; height:100%; object-fit:cover;}
+.admin-list-info{flex:1; min-width:140px;}
+.admin-list-info b{font-size:0.95rem;}
+.admin-list-info span{display:block; font-size:0.78rem; color:var(--ink-soft);}
+.admin-list-actions{display:flex; gap:6px; flex-wrap:wrap;}
+.admin-comment-row{display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid rgba(0,0,0,0.06); font-size:0.85rem;}
+.data-tools{display:flex; gap:10px; flex-wrap:wrap;}
+.admin-login-box{max-width:360px; margin:120px auto; background:var(--paper); padding:32px; border-radius:var(--radius); box-shadow:var(--shadow); text-align:center;}
+.admin-login-box input{width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin:14px 0; font-size:1rem; text-align:center;}
+#admin-login-error{color:var(--brick-dark); font-size:0.85rem; min-height:18px;}
+
+/* ---------- 토스트 알림 ---------- */
+#toast{
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:#fff; padding:13px 22px; border-radius:999px; font-size:0.88rem;
+  box-shadow:0 8px 20px rgba(0,0,0,0.3); z-index:200; opacity:0; transition:opacity .25s, transform .25s;
+  pointer-events:none; max-width:90vw; text-align:center;
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+/* ---------- 반응형 ---------- */
+@media (max-width:640px){
+  .gallery-grid{grid-template-columns:1fr; gap:28px;}
+  .entrance-card{padding:40px 24px;}
+  .admin-list-item{flex-direction:column; align-items:flex-start;}
+}
+</style>
+</head>
+<body>
+<div id="firebase-warning" class="hidden" style="position:fixed; top:0; left:0; right:0; z-index:999; background:#8B4A43; color:#fff; text-align:center; padding:10px 16px; font-size:0.85rem; font-weight:700;">
+  ⚠️ Firebase 설정이 비어있어요. 코드 맨 아래 &lt;script&gt; 부분의 firebaseConfig 값을 채워주세요.
+</div>
+
+<!-- =========================================================
+     화면 1: 입장 화면
+     ========================================================= -->
+<div id="screen-entrance">
+  <div class="entrance-card">
+    <div class="entrance-eyebrow">ONLINE EXHIBITION</div>
+    <h1>우리 반 온라인 전시회</h1>
+    <div class="entrance-divider"></div>
+    <p class="entrance-desc">사진, 그림, 영상 작품을 감상하고<br>서로의 생각을 댓글로 남겨보세요.</p>
+    <div class="entrance-actions">
+      <button class="btn btn-primary" onclick="enterGallery()">전시회 입장하기</button>
+      <button class="btn btn-ghost" onclick="openAdminLogin()">관리자 모드</button>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     화면 2: 전시 공간(갤러리 홀)
+     ========================================================= -->
+<div id="screen-gallery" class="hidden">
+  <div class="gallery-header">
+    <div class="gallery-header-top">
+      <h2 class="gallery-title">🖼 우리 반 온라인 전시회</h2>
+      <div class="gallery-header-actions">
+        <button class="btn btn-ghost btn-small" onclick="goEntrance()">처음으로</button>
+        <button class="btn btn-brass btn-small" onclick="openAdminLogin()">관리자 모드</button>
+      </div>
+    </div>
+    <div class="gallery-toolbar">
+      <input type="text" id="search-input" placeholder="작품 제목, 작가, 설명으로 검색해보세요" oninput="renderGallery()">
+      <button class="filter-chip active" data-type="all" onclick="setFilter('all')">전체</button>
+      <button class="filter-chip" data-type="photo" onclick="setFilter('photo')">사진</button>
+      <button class="filter-chip" data-type="painting" onclick="setFilter('painting')">그림</button>
+      <button class="filter-chip" data-type="video" onclick="setFilter('video')">동영상</button>
+    </div>
+  </div>
+  <div class="gallery-grid" id="gallery-grid"></div>
+</div>
+
+<!-- =========================================================
+     상세 보기 모달 (관람객용)
+     ========================================================= -->
+<div id="modal-detail" class="modal-backdrop hidden">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeDetail()">✕</button>
+    <div class="modal-media" id="modal-media"></div>
+    <div class="modal-body">
+      <h2 class="modal-title" id="modal-title"></h2>
+      <div class="modal-artist" id="modal-artist"></div>
+      <div class="modal-tags">
+        <span class="tag" id="modal-type"></span>
+      </div>
+      <p class="modal-desc" id="modal-desc"></p>
+      <button class="btn btn-brass btn-small appreciate-btn" id="appreciate-btn" onclick="markViewed()">
+        🙌 감상했어요 <span id="view-count">0</span>
+      </button>
+
+      <div class="comments-section">
+        <h3>💬 방문자 한마디</h3>
+        <div id="comments-list"></div>
+        <div class="comment-form">
+          <input type="text" id="comment-name" placeholder="이름 또는 닉네임" maxlength="20">
+          <textarea id="comment-content" placeholder="작품에 대한 생각을 남겨주세요" maxlength="300"></textarea>
+          <button class="btn btn-primary btn-block" onclick="submitComment()">댓글 등록</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     관리자 로그인 모달
+     ========================================================= -->
+<div id="modal-admin-login" class="modal-backdrop hidden">
+  <div class="admin-login-box">
+    <h2>🔐 관리자 모드</h2>
+    <p style="color:var(--ink-soft); font-size:0.9rem;">비밀번호를 입력해주세요.</p>
+    <input type="password" id="admin-password-input" placeholder="비밀번호" onkeydown="if(event.key==='Enter')checkAdminPassword()">
+    <div id="admin-login-error"></div>
+    <div style="display:flex; gap:10px; margin-top:8px;">
+      <button class="btn btn-ghost btn-block" onclick="closeAdminLogin()">취소</button>
+      <button class="btn btn-primary btn-block" onclick="checkAdminPassword()">입장</button>
+    </div>
+  </div>
+</div>
+
+<!-- =========================================================
+     화면 3: 관리자 패널
+     ========================================================= -->
+<div id="screen-admin" class="hidden">
+  <div class="admin-header">
+    <h2 style="margin:0;">⚙️ 관리자 패널</h2>
+    <div style="display:flex; gap:8px;">
+      <button class="btn btn-ghost btn-small" onclick="goEntrance()">처음으로</button>
+      <button class="btn btn-brass btn-small" onclick="exitAdmin()">관람 모드로</button>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h2 id="form-title">➕ 새 작품 추가</h2>
+    <div class="form-grid">
+      <input type="hidden" id="edit-id">
+      <div>
+        <label>작품 제목</label>
+        <input type="text" id="f-title" maxlength="40" placeholder="예) 봄날의 학교">
+      </div>
+      <div>
+        <label>작가 이름</label>
+        <input type="text" id="f-artist" maxlength="20" placeholder="예) 김OO">
+      </div>
+      <div>
+        <label>작품 유형</label>
+        <select id="f-type">
+          <option value="photo">사진</option>
+          <option value="painting">그림</option>
+          <option value="video">동영상</option>
+        </select>
+      </div>
+      <div>
+        <label>작품 설명</label>
+        <textarea id="f-desc" maxlength="300" placeholder="작품에 대한 설명을 적어주세요"></textarea>
+      </div>
+      <div>
+        <label>파일 첨부 (이미지 또는 동영상)</label>
+        <input type="file" id="f-file" accept="image/*,video/*" onchange="handleFilePreview(event)">
+        <div class="preview-box" id="file-preview-box">미리보기</div>
+        <div class="file-warning">⚠️ 동영상은 큰 파일을 올리면 브라우저 저장 용량 초과로 저장이 안 될 수 있어요. 짧고 작은 영상으로 테스트해주세요.</div>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-primary" onclick="saveArtworkForm()">저장하기</button>
+        <button class="btn btn-ghost hidden" id="cancel-edit-btn" onclick="resetForm()">수정 취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h2>🗂 작품 목록 관리</h2>
+    <div id="admin-artwork-list"></div>
+  </div>
+
+  <div class="admin-section">
+    <h2>📦 데이터 관리</h2>
+    <div class="data-tools">
+      <button class="btn btn-brass" onclick="exportData()">전체 데이터 내보내기</button>
+      <button class="btn btn-brass" onclick="document.getElementById('import-file-input').click()">데이터 가져오기</button>
+      <input type="file" id="import-file-input" accept="application/json" class="hidden" onchange="importData(event)">
+      <button class="btn btn-danger" onclick="resetAllData()">전체 초기화</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div class="watermark">made by 박선생</div>
+
+<script>
+/* =========================================================
+   ■ 데이터 저장 구조 (Firebase Realtime Database)
+   /artworks/{작품id}        : {title, artist, type, desc, fileData(base64 또는 null), thumbGradient, createdAt}
+   /comments/{작품id}/{댓글id} : {name, content, time}
+   /views/{작품id}            : 감상수(숫자)
+
+   ※ "감상했어요"를 내가 눌렀는지 여부는 공유할 필요가 없는 개인 정보라
+     이것만 이 브라우저의 localStorage(GAL_VIEWED_IDS)에 저장합니다.
+   ※ 관리자 비밀번호는 보안을 위해 DB에 저장하지 않고 아래 JS 상수로 관리합니다.
+     (단, 이 방식은 코드를 볼 수 있는 사람에게는 비밀번호가 노출되므로
+      완전한 보안은 아니라는 점을 꼭 기억해주세요.)
+   ========================================================= */
+const ADMIN_PASSWORD = "1234"; // 관리자 비밀번호 (원하면 이 줄만 수정하세요)
+
+const KEY_VIEWED_IDS = "GAL_VIEWED_IDS";
+
+let currentFilter = "all";
+let currentDetailId = null;
+let pendingFileData = null; // 파일 첨부 미리보기에서 base64로 변환된 값 임시 저장
+
+/* ---------------------------------------------------------
+   ▶▶ Firebase 설정 ◀◀
+   Firebase 콘솔 > 프로젝트 설정 > 웹 앱에서 복사한 값을
+   아래 객체에 그대로 붙여넣어 주세요.
+   --------------------------------------------------------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBhj94EpI1AjtciU2mYVW-24qeGzRciqwg",
+  authDomain: "exhibition-b3fb6.firebaseapp.com",
+  databaseURL: "https://exhibition-b3fb6-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "exhibition-b3fb6",
+  storageBucket: "exhibition-b3fb6.firebasestorage.app",
+  messagingSenderId: "312725018844",
+  appId: "1:312725018844:web:892a9f96ade80e7bbc7c19",
+  measurementId: "G-864Z4GFPKD"
+};
+
+let db = null;
+let FIREBASE_CONFIGURED = false;
+let listenersAttached = false;
+let hasCheckedSeed = false;
+
+// 캐시: Firebase 실시간 리스너가 채워주는 "현재 데이터의 거울"
+let cachedArtworks = {};  // { id: {...} }
+let cachedComments = {};  // { artworkId: { commentId: {...} } }
+let cachedViews = {};     // { artworkId: number }
+
+function initFirebase(){
+  const filled = firebaseConfig.databaseURL && !firebaseConfig.databaseURL.includes("여기에-");
+  if(!filled){
+    FIREBASE_CONFIGURED = false;
+    document.getElementById("firebase-warning").classList.remove("hidden");
+    return;
+  }
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.database();
+    FIREBASE_CONFIGURED = firebaseConfig.databaseURL.includes("firebasedatabase.app");
+    attachListeners();
+  }catch(e){
+    console.error("Firebase 초기화 오류:", e);
+    FIREBASE_CONFIGURED = false;
+    db = null;
+    document.getElementById("firebase-warning").classList.remove("hidden");
+    showToast("⚠️ Firebase 초기화에 실패했어요. config 값을 확인해주세요.");
+  }
+}
+
+function requireDb(){
+  if(!db){
+    showToast("⚠️ Firebase 설정이 필요해요. 코드 상단 firebaseConfig를 입력해주세요.");
+    return false;
+  }
+  return true;
+}
+
+/* ---------------------------------------------------------
+   실시간 리스너: DB가 바뀌면 자동으로 캐시 갱신 + 화면 갱신
+   --------------------------------------------------------- */
+function attachListeners(){
+  if(!db || listenersAttached) return;
+  listenersAttached = true;
+
+  db.ref("artworks").on("value", snap=>{
+    cachedArtworks = snap.val() || {};
+    seedIfEmptyOnce();
+    refreshCurrentScreen();
+  }, err=>{
+    console.error(err);
+    showToast("⚠️ 작품 데이터를 불러오지 못했어요. 인터넷 연결과 보안 규칙을 확인해주세요.");
+  });
+
+  db.ref("comments").on("value", snap=>{
+    cachedComments = snap.val() || {};
+    refreshCurrentScreen();
+  });
+
+  db.ref("views").on("value", snap=>{
+    cachedViews = snap.val() || {};
+    refreshCurrentScreen();
+  });
+}
+
+function getArtworksArray(){
+  return Object.keys(cachedArtworks).map(id=> Object.assign({id}, cachedArtworks[id]));
+}
+function getCommentsArray(artworkId){
+  const node = cachedComments[artworkId];
+  if(!node) return [];
+  return Object.keys(node).map(cid=> Object.assign({id:cid}, node[cid])).sort((a,b)=>a.time-b.time);
+}
+
+function refreshCurrentScreen(){
+  if(!document.getElementById("screen-gallery").classList.contains("hidden")){
+    renderGallery();
+  }
+  if(!document.getElementById("screen-admin").classList.contains("hidden")){
+    renderAdminList();
+  }
+  if(!document.getElementById("modal-detail").classList.contains("hidden") && currentDetailId){
+    refreshDetailModal();
+  }
+}
+
+/* ---------------------------------------------------------
+   개인 브라우저 저장(감상 여부) - localStorage 그대로 사용
+   --------------------------------------------------------- */
+function loadViewedIds(){
+  try{ return JSON.parse(localStorage.getItem(KEY_VIEWED_IDS)) || []; }
+  catch(e){ return []; }
+}
+function saveViewedIds(arr){
+  try{ localStorage.setItem(KEY_VIEWED_IDS, JSON.stringify(arr)); }
+  catch(e){ console.error(e); }
+}
+
+function generateId(){
+  return "art_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
+}
+function escapeHtml(str){
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : str;
+  return div.innerHTML;
+}
+function formatTime(ts){
+  const d = new Date(ts);
+  return d.getFullYear() + "." + String(d.getMonth()+1).padStart(2,"0") + "." + String(d.getDate()).padStart(2,"0") +
+    " " + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0");
+}
+function typeLabel(type){
+  return type === "photo" ? "사진" : type === "painting" ? "그림" : "동영상";
+}
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.classList.remove("show"), 2400);
+}
+
+/* ---------------------------------------------------------
+   초기 예시 작품 (DB가 비어있을 때 1회만 자동 생성)
+   --------------------------------------------------------- */
+function seedDefaultArtworks(){
+  if(!requireDb()) return;
+  const id1 = generateId(), id2 = generateId(), id3 = generateId();
+  const seedObj = {
+    [id1]: {title:"봄날의 학교", artist:"김OO", type:"photo",
+      desc:"학교 운동장에 핀 꽃을 찍은 사진입니다.",
+      fileData:null, thumbGradient:"linear-gradient(135deg,#F6C667,#E89A4E)", createdAt: Date.now()-300000},
+    [id2]: {title:"상상의 동물", artist:"이OO", type:"painting",
+      desc:"내가 상상한 새로운 동물을 그린 작품입니다.",
+      fileData:null, thumbGradient:"linear-gradient(135deg,#7FB7A6,#4F8C8B)", createdAt: Date.now()-200000},
+    [id3]: {title:"우리 반 하루", artist:"박OO", type:"video",
+      desc:"우리 반의 하루를 짧은 영상으로 표현한 작품입니다.",
+      fileData:null, thumbGradient:"linear-gradient(135deg,#9C8BC9,#5E5A9C)", createdAt: Date.now()-100000}
+  };
+  db.ref("artworks").set(seedObj);
+  db.ref("comments").set(null);
+  db.ref("views").set(null);
+}
+function seedIfEmptyOnce(){
+  if(hasCheckedSeed) return;
+  hasCheckedSeed = true;
+  if(!cachedArtworks || Object.keys(cachedArtworks).length === 0){
+    seedDefaultArtworks();
+  }
+}
+
+/* ---------------------------------------------------------
+   화면 전환
+   --------------------------------------------------------- */
+function show(id){
+  ["screen-entrance","screen-gallery","screen-admin"].forEach(s=>{
+    document.getElementById(s).classList.toggle("hidden", s !== id);
+  });
+}
+function enterGallery(){
+  show("screen-gallery");
+  renderGallery();
+}
+function goEntrance(){
+  show("screen-entrance");
+}
+function exitAdmin(){
+  show("screen-gallery");
+  renderGallery();
+}
+
+/* ---------------------------------------------------------
+   갤러리 렌더링
+   --------------------------------------------------------- */
+function setFilter(type){
+  currentFilter = type;
+  document.querySelectorAll(".filter-chip").forEach(btn=>{
+    btn.classList.toggle("active", btn.dataset.type === type);
+  });
+  renderGallery();
+}
+
+function renderGallery(){
+  const grid = document.getElementById("gallery-grid");
+  const artworks = getArtworksArray();
+  const searchTerm = (document.getElementById("search-input").value || "").trim().toLowerCase();
+
+  if(!FIREBASE_CONFIGURED){
+    grid.innerHTML = '<div class="empty-msg">⚠️ Firebase 설정이 필요해요. 코드 상단의 firebaseConfig 값을 채워주세요.</div>';
+    return;
+  }
+
+  let filtered = artworks.filter(a=>{
+    if(currentFilter !== "all" && a.type !== currentFilter) return false;
+    if(searchTerm){
+      const blob = (a.title+" "+a.artist+" "+a.desc).toLowerCase();
+      if(!blob.includes(searchTerm)) return false;
+    }
+    return true;
+  });
+
+  if(filtered.length === 0){
+    grid.innerHTML = '<div class="empty-msg">조건에 맞는 작품이 없어요. 다른 검색어나 필터를 시도해보세요.</div>';
+    return;
+  }
+
+  filtered.sort((a,b)=> (a.createdAt||0) - (b.createdAt||0));
+
+  grid.innerHTML = filtered.map(a=>{
+    const cCount = getCommentsArray(a.id).length;
+    const vCount = cachedViews[a.id] || 0;
+    let mediaHtml;
+    if(a.fileData && a.type === "video"){
+      mediaHtml = `<video muted></video><div class="placeholder-icon">▶️</div>`;
+    }else if(a.fileData){
+      mediaHtml = `<img src="${a.fileData}" alt="${escapeHtml(a.title)}">`;
+    }else{
+      const icon = a.type === "video" ? "🎬" : a.type === "painting" ? "🎨" : "📷";
+      mediaHtml = `<div style="position:absolute;inset:0;background:${a.thumbGradient || 'linear-gradient(135deg,#ccc,#999)'}"></div><div class="placeholder-icon">${icon}</div>`;
+    }
+    return `
+      <div class="artwork-frame" onclick="openDetail('${a.id}')">
+        <div class="frame-outer">
+          <div class="frame-mat">
+            <div class="frame-media">
+              ${mediaHtml}
+              <span class="type-badge">${typeLabel(a.type)}</span>
+            </div>
+          </div>
+        </div>
+        <div class="plaque">
+          <div class="p-title">${escapeHtml(a.title)}</div>
+          <div class="p-artist">${escapeHtml(a.artist)}</div>
+          <div class="p-meta"><span>🙌 ${vCount}</span><span>💬 ${cCount}</span></div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+/* ---------------------------------------------------------
+   상세 보기 모달
+   --------------------------------------------------------- */
+function openDetail(id){
+  const a = cachedArtworks[id];
+  if(!a) return;
+  currentDetailId = id;
+
+  const mediaBox = document.getElementById("modal-media");
+  if(a.fileData && a.type === "video"){
+    mediaBox.innerHTML = `<video src="${a.fileData}" controls></video>`;
+  }else if(a.fileData){
+    mediaBox.innerHTML = `<img src="${a.fileData}" alt="${escapeHtml(a.title)}">`;
+  }else{
+    const icon = a.type === "video" ? "🎬" : a.type === "painting" ? "🎨" : "📷";
+    mediaBox.innerHTML = `<div style="width:100%;height:260px;background:${a.thumbGradient || 'linear-gradient(135deg,#ccc,#999)'};display:flex;align-items:center;justify-content:center;"><span class="placeholder-icon">${icon}</span></div>`;
+  }
+
+  document.getElementById("modal-title").textContent = a.title;
+  document.getElementById("modal-artist").textContent = "작가: " + a.artist;
+  document.getElementById("modal-type").textContent = typeLabel(a.type);
+  document.getElementById("modal-desc").textContent = a.desc;
+
+  document.getElementById("view-count").textContent = cachedViews[id] || 0;
+  const viewedIds = loadViewedIds();
+  document.getElementById("appreciate-btn").disabled = viewedIds.includes(id);
+  document.getElementById("appreciate-btn").style.opacity = viewedIds.includes(id) ? "0.55" : "1";
+
+  renderComments(id);
+  document.getElementById("comment-name").value = "";
+  document.getElementById("comment-content").value = "";
+  document.getElementById("modal-detail").classList.remove("hidden");
+}
+
+// 모달이 열려있는 동안 다른 사람이 댓글/감상수를 바꾸면 화면만 조용히 갱신 (입력창은 그대로 둠)
+function refreshDetailModal(){
+  if(!currentDetailId || !cachedArtworks[currentDetailId]) return;
+  document.getElementById("view-count").textContent = cachedViews[currentDetailId] || 0;
+  renderComments(currentDetailId);
+}
+
+function closeDetail(){
+  document.getElementById("modal-detail").classList.add("hidden");
+  currentDetailId = null;
+  renderGallery();
+}
+
+function markViewed(){
+  if(!currentDetailId || !requireDb()) return;
+  const viewedIds = loadViewedIds();
+  if(viewedIds.includes(currentDetailId)){
+    showToast("이미 감상 표시를 남긴 작품이에요 🙂");
+    return;
+  }
+  // transaction: 여러 명이 동시에 눌러도 감상수가 정확히 더해지도록 처리
+  db.ref("views/" + currentDetailId).transaction(curr => (curr || 0) + 1)
+    .then(()=>{
+      viewedIds.push(currentDetailId);
+      saveViewedIds(viewedIds);
+      document.getElementById("appreciate-btn").disabled = true;
+      document.getElementById("appreciate-btn").style.opacity = "0.55";
+      showToast("감상해주셔서 감사합니다! 🙌");
+    })
+    .catch(err=>{
+      console.error(err);
+      showToast("⚠️ 감상 표시 중 오류가 발생했어요.");
+    });
+}
+
+function renderComments(artworkId){
+  const list = getCommentsArray(artworkId);
+  const box = document.getElementById("comments-list");
+  if(list.length === 0){
+    box.innerHTML = '<div class="no-comments">아직 댓글이 없어요. 첫 댓글을 남겨보세요!</div>';
+    return;
+  }
+  box.innerHTML = list.slice().reverse().map(c=>`
+    <div class="comment-item">
+      <div class="comment-top">
+        <span>${escapeHtml(c.name)}</span>
+        <span class="comment-time">${formatTime(c.time)}</span>
+      </div>
+      <div class="comment-content">${escapeHtml(c.content)}</div>
+    </div>
+  `).join("");
+}
+
+function submitComment(){
+  if(!requireDb()) return;
+  const name = document.getElementById("comment-name").value.trim();
+  const content = document.getElementById("comment-content").value.trim();
+  if(!name || !content){
+    showToast("이름과 댓글 내용을 모두 입력해주세요.");
+    return;
+  }
+  const commentId = generateId();
+  db.ref("comments/" + currentDetailId + "/" + commentId).set({ name, content, time: Date.now() })
+    .then(()=>{
+      document.getElementById("comment-name").value = "";
+      document.getElementById("comment-content").value = "";
+      showToast("댓글이 등록되었습니다 💬");
+    })
+    .catch(err=>{
+      console.error(err);
+      showToast("⚠️ 댓글 등록에 실패했어요. 보안 규칙을 확인해주세요.");
+    });
+}
+
+/* ---------------------------------------------------------
+   관리자 로그인
+   --------------------------------------------------------- */
+function openAdminLogin(){
+  document.getElementById("admin-password-input").value = "";
+  document.getElementById("admin-login-error").textContent = "";
+  document.getElementById("modal-admin-login").classList.remove("hidden");
+  setTimeout(()=>document.getElementById("admin-password-input").focus(), 50);
+}
+function closeAdminLogin(){
+  document.getElementById("modal-admin-login").classList.add("hidden");
+}
+function checkAdminPassword(){
+  const val = document.getElementById("admin-password-input").value;
+  if(val === ADMIN_PASSWORD){
+    closeAdminLogin();
+    show("screen-admin");
+    resetForm();
+    renderAdminList();
+  }else{
+    document.getElementById("admin-login-error").textContent = "비밀번호가 올바르지 않습니다.";
+  }
+}
+
+/* ---------------------------------------------------------
+   관리자: 작품 추가/수정 폼
+   --------------------------------------------------------- */
+function handleFilePreview(e){
+  const file = e.target.files[0];
+  const previewBox = document.getElementById("file-preview-box");
+  pendingFileData = null;
+  if(!file) { previewBox.innerHTML = "미리보기"; return; }
+
+  const sizeMB = file.size / (1024*1024);
+  if(file.type.startsWith("video/") && sizeMB > 5){
+    showToast("⚠️ 동영상 용량이 커서(약 " + sizeMB.toFixed(1) + "MB) Firebase 저장이 안 될 수 있어요. 짧은 영상을 권장해요.");
+  }else if(file.type.startsWith("image/") && sizeMB > 3){
+    showToast("⚠️ 이미지 용량이 커서(약 " + sizeMB.toFixed(1) + "MB) 저장에 실패할 수 있어요.");
+  }
+
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    pendingFileData = ev.target.result;
+    if(file.type.startsWith("video/")){
+      previewBox.innerHTML = `<video src="${pendingFileData}" muted></video>`;
+    }else{
+      previewBox.innerHTML = `<img src="${pendingFileData}">`;
+    }
+    if(file.type.startsWith("video/")) document.getElementById("f-type").value = "video";
+  };
+  reader.onerror = function(){
+    showToast("⚠️ 파일을 읽는 중 문제가 발생했어요. 다른 파일로 시도해주세요.");
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetForm(){
+  document.getElementById("edit-id").value = "";
+  document.getElementById("f-title").value = "";
+  document.getElementById("f-artist").value = "";
+  document.getElementById("f-type").value = "photo";
+  document.getElementById("f-desc").value = "";
+  document.getElementById("f-file").value = "";
+  document.getElementById("file-preview-box").innerHTML = "미리보기";
+  document.getElementById("form-title").textContent = "➕ 새 작품 추가";
+  document.getElementById("cancel-edit-btn").classList.add("hidden");
+  pendingFileData = null;
+}
+
+function saveArtworkForm(){
+  if(!requireDb()) return;
+  const id = document.getElementById("edit-id").value;
+  const title = document.getElementById("f-title").value.trim();
+  const artist = document.getElementById("f-artist").value.trim();
+  const type = document.getElementById("f-type").value;
+  const desc = document.getElementById("f-desc").value.trim();
+
+  if(!title || !artist || !desc){
+    showToast("제목, 작가 이름, 설명을 모두 입력해주세요.");
+    return;
+  }
+
+  if(id){
+    // 수정
+    const updateObj = { title, artist, type, desc };
+    if(pendingFileData) updateObj.fileData = pendingFileData;
+    db.ref("artworks/" + id).update(updateObj)
+      .then(()=>{
+        showToast("작품이 수정되었습니다 ✏️");
+        resetForm();
+        renderAdminList();
+      })
+      .catch(err=>{ console.error(err); showToast("⚠️ 수정 중 오류가 발생했어요. (용량 초과일 수 있어요)"); });
+  }else{
+    // 추가
+    const newId = generateId();
+    const newArt = {
+      title, artist, type, desc,
+      fileData: pendingFileData || null,
+      thumbGradient: "linear-gradient(135deg,#B7A6D6,#7C6BA0)",
+      createdAt: Date.now()
+    };
+    db.ref("artworks/" + newId).set(newArt)
+      .then(()=>{
+        showToast("새 작품이 등록되었습니다 🎉");
+        resetForm();
+        renderAdminList();
+      })
+      .catch(err=>{ console.error(err); showToast("⚠️ 등록 중 오류가 발생했어요. (용량 초과일 수 있어요)"); });
+  }
+}
+
+function startEditArtwork(id){
+  const a = cachedArtworks[id];
+  if(!a) return;
+  document.getElementById("edit-id").value = id;
+  document.getElementById("f-title").value = a.title;
+  document.getElementById("f-artist").value = a.artist;
+  document.getElementById("f-type").value = a.type;
+  document.getElementById("f-desc").value = a.desc;
+  document.getElementById("f-file").value = "";
+  pendingFileData = null;
+  const previewBox = document.getElementById("file-preview-box");
+  if(a.fileData){
+    previewBox.innerHTML = a.type === "video" ? `<video src="${a.fileData}" muted></video>` : `<img src="${a.fileData}">`;
+  }else{
+    previewBox.innerHTML = "미리보기 (현재 파일 없음)";
+  }
+  document.getElementById("form-title").textContent = "✏️ 작품 수정";
+  document.getElementById("cancel-edit-btn").classList.remove("hidden");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function deleteArtwork(id){
+  if(!requireDb()) return;
+  if(!confirm("정말 이 작품을 삭제하시겠습니까?")) return;
+  const deleteCommentsToo = confirm("이 작품의 댓글도 함께 삭제하시겠습니까?\n(취소를 누르면 작품만 삭제됩니다)");
+
+  db.ref("artworks/" + id).remove()
+    .then(()=>{
+      db.ref("views/" + id).remove();
+      if(deleteCommentsToo) db.ref("comments/" + id).remove();
+      showToast("작품이 삭제되었습니다 🗑");
+      renderAdminList();
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 삭제 중 오류가 발생했어요."); });
+}
+
+/* ---------------------------------------------------------
+   관리자: 작품 목록 + 댓글 관리
+   --------------------------------------------------------- */
+function renderAdminList(){
+  const artworks = getArtworksArray().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const box = document.getElementById("admin-artwork-list");
+
+  if(!FIREBASE_CONFIGURED){
+    box.innerHTML = '<div class="no-comments">⚠️ Firebase 설정이 필요해요.</div>';
+    return;
+  }
+  if(artworks.length === 0){
+    box.innerHTML = '<div class="no-comments">등록된 작품이 없어요.</div>';
+    return;
+  }
+
+  box.innerHTML = artworks.map(a=>{
+    const cList = getCommentsArray(a.id);
+    let thumb;
+    if(a.fileData && a.type === "video"){
+      thumb = `<video src="${a.fileData}" muted></video>`;
+    }else if(a.fileData){
+      thumb = `<img src="${a.fileData}">`;
+    }else{
+      thumb = `<div style="width:100%;height:100%;background:${a.thumbGradient || '#ccc'};"></div>`;
+    }
+    const commentsHtml = cList.length === 0
+      ? '<div class="no-comments" style="margin-top:8px;">댓글 없음</div>'
+      : cList.map(c=>`
+          <div class="admin-comment-row">
+            <span><b>${escapeHtml(c.name)}</b>: ${escapeHtml(c.content)}</span>
+            <button class="btn btn-danger btn-small" onclick="deleteComment('${a.id}','${c.id}')">삭제</button>
+          </div>
+        `).join("");
+
+    return `
+      <div class="admin-list-item" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+          <div class="admin-thumb">${thumb}</div>
+          <div class="admin-list-info">
+            <b>${escapeHtml(a.title)}</b>
+            <span>${escapeHtml(a.artist)} · ${typeLabel(a.type)} · 댓글 ${cList.length}개</span>
+          </div>
+          <div class="admin-list-actions">
+            <button class="btn btn-ghost btn-small" onclick="startEditArtwork('${a.id}')">수정</button>
+            <button class="btn btn-danger btn-small" onclick="deleteArtwork('${a.id}')">삭제</button>
+          </div>
+        </div>
+        <details style="margin-top:10px;">
+          <summary style="cursor:pointer; font-size:0.82rem; color:var(--ink-soft);">댓글 관리 (${cList.length})</summary>
+          <div style="margin-top:6px;">${commentsHtml}</div>
+        </details>
+      </div>
+    `;
+  }).join("");
+}
+
+function deleteComment(artworkId, commentId){
+  if(!requireDb()) return;
+  if(!confirm("이 댓글을 삭제하시겠습니까?")) return;
+  db.ref("comments/" + artworkId + "/" + commentId).remove()
+    .then(()=>{ showToast("댓글이 삭제되었습니다."); renderAdminList(); })
+    .catch(err=>{ console.error(err); showToast("⚠️ 삭제 중 오류가 발생했어요."); });
+}
+
+/* ---------------------------------------------------------
+   관리자: 데이터 내보내기 / 가져오기 / 전체 초기화
+   --------------------------------------------------------- */
+function exportData(){
+  const data = {
+    artworks: cachedArtworks,
+    comments: cachedComments,
+    views: cachedViews,
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "온라인전시회_데이터_" + new Date().toISOString().slice(0,10) + ".json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("데이터를 내보냈어요 📦");
+}
+
+// 예전 localStorage 버전(배열 형태)으로 내보낸 파일도 그대로 가져올 수 있도록 자동 변환합니다.
+function normalizeImportedArtworks(artworksData){
+  if(Array.isArray(artworksData)){
+    const obj = {};
+    artworksData.forEach(a=>{ const id = a.id || generateId(); obj[id] = Object.assign({}, a); delete obj[id].id; });
+    return obj;
+  }
+  return artworksData || {};
+}
+function normalizeImportedComments(commentsData){
+  const obj = {};
+  Object.keys(commentsData || {}).forEach(aid=>{
+    const node = commentsData[aid];
+    if(Array.isArray(node)){
+      const inner = {};
+      node.forEach(c=>{ const cid = c.id || generateId(); inner[cid] = Object.assign({}, c); delete inner[cid].id; });
+      obj[aid] = inner;
+    }else{
+      obj[aid] = node;
+    }
+  });
+  return obj;
+}
+
+function importData(e){
+  if(!requireDb()){ e.target.value=""; return; }
+  const file = e.target.files[0];
+  if(!file) return;
+  if(!confirm("가져온 데이터로 현재 작품/댓글 데이터를 덮어씁니다. 계속하시겠습니까?")){
+    e.target.value = "";
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    try{
+      const data = JSON.parse(ev.target.result);
+      if(!data.artworks){ throw new Error("형식이 올바르지 않습니다."); }
+      const artworksObj = normalizeImportedArtworks(data.artworks);
+      const commentsObj = normalizeImportedComments(data.comments || {});
+      Promise.all([
+        db.ref("artworks").set(artworksObj),
+        db.ref("comments").set(Object.keys(commentsObj).length ? commentsObj : null),
+        db.ref("views").set(data.views && Object.keys(data.views).length ? data.views : null)
+      ]).then(()=>{
+        showToast("데이터를 가져왔습니다 ✅");
+      }).catch(err=>{
+        console.error(err);
+        showToast("⚠️ 가져오기 중 오류가 발생했어요. (용량 초과일 수 있어요)");
+      });
+    }catch(err){
+      console.error(err);
+      showToast("⚠️ 파일을 읽을 수 없어요. JSON 형식을 확인해주세요.");
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+}
+
+function resetAllData(){
+  if(!requireDb()) return;
+  if(!confirm("모든 작품, 댓글, 감상 기록이 삭제되고 예시 작품만 남습니다.\n정말 초기화하시겠습니까?")) return;
+  seedDefaultArtworks();
+  showToast("전체 데이터가 초기화되었습니다.");
+}
+
+/* ---------------------------------------------------------
+   초기 실행
+   --------------------------------------------------------- */
+window.addEventListener("DOMContentLoaded", ()=>{
+  initFirebase();
+});
+</script>
+</body>
+</html>
