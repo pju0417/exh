@@ -1882,27 +1882,54 @@ function extractGradientColors(gradStr){
   return matches;
 }
 
-function buildArtworkTexture(art){
-  const ar = art.aspectRatio && art.aspectRatio > 0 ? art.aspectRatio : (4/3);
-  const base = 256;
-  const canvas = document.createElement("canvas");
-  if(ar >= 1){ canvas.width = base; canvas.height = Math.round(base / ar); }
-  else { canvas.height = base; canvas.width = Math.round(base * ar); }
-  const ctx = canvas.getContext("2d");
-  drawArtPlaceholder(ctx, art, canvas.width, canvas.height);
-  const texture = new THREE.CanvasTexture(canvas);
+// 3D 전시관에서만 쓰는 "적정 해상도" 기준 (긴 쪽 기준 px).
+// 2D 갤러리·상세보기·Firebase에 저장된 원본 사진에는 전혀 영향을 주지 않습니다.
+const THREE_TEXTURE_MAX_DIM = 1024;
 
-  // 실제 이미지 파일이 있으면 비동기로 그려서 텍스처를 교체
-  if(art.fileData){
-    const img = new Image();
-    img.onload = function(){
-      ctx.clearRect(0,0,canvas.width,canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      texture.needsUpdate = true;
-    };
-    img.onerror = function(){ /* 그림이 깨져도 placeholder 유지 */ };
-    img.src = art.fileData;
+// 원본 이미지를 받아서, 너무 크면 적정 해상도로 줄인 캔버스를 돌려줍니다.
+// (원본이 이미 적정 해상도보다 작으면 그대로 사용 - 억지로 키우지 않음)
+function resizeImageForTexture(img, maxDim){
+  let w = img.naturalWidth || img.width;
+  let h = img.naturalHeight || img.height;
+  if(Math.max(w, h) > maxDim){
+    const scale = maxDim / Math.max(w, h);
+    w = Math.max(1, Math.round(w * scale));
+    h = Math.max(1, Math.round(h * scale));
   }
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, w, h);
+  return canvas;
+}
+
+function buildArtworkTexture(art){
+  // 파일이 없는 작품(placeholder)만 작은 캔버스(그라데이션+아이콘)를 사용합니다.
+  if(!art.fileData){
+    const ar = art.aspectRatio && art.aspectRatio > 0 ? art.aspectRatio : (4/3);
+    const base = 256;
+    const canvas = document.createElement("canvas");
+    if(ar >= 1){ canvas.width = base; canvas.height = Math.round(base / ar); }
+    else { canvas.height = base; canvas.width = Math.round(base * ar); }
+    const ctx = canvas.getContext("2d");
+    drawArtPlaceholder(ctx, art, canvas.width, canvas.height);
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // 실제 사진이 있으면, 3D 전시관 전용으로 적정 해상도로 줄인 뒤 텍스처로 사용합니다.
+  // (원본 파일과 2D 화면은 그대로 원본 해상도를 씁니다)
+  const img = new Image();
+  const texture = new THREE.Texture();
+  img.onload = function(){
+    texture.image = resizeImageForTexture(img, THREE_TEXTURE_MAX_DIM);
+    texture.needsUpdate = true;
+    // 화면에서 비스듬히 보일 때도 또렷하게 보이도록 anisotropic 필터링 적용
+    if(threeRenderer){
+      texture.anisotropy = threeRenderer.capabilities.getMaxAnisotropy();
+    }
+  };
+  img.onerror = function(){ /* 사진이 깨지면 텍스처 없이 액자 색만 표시됨 */ };
+  img.src = art.fileData;
   return texture;
 }
 
