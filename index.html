@@ -10,6 +10,7 @@
 <!-- Firebase (compat SDK: 빌드 도구 없이 <script> 태그로 바로 사용) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <style>
 /* =========================================================
    디자인 토큰 (색상 / 타이포그래피)
@@ -263,10 +264,38 @@ button{font-family:inherit; cursor:pointer;}
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
 
 /* ---------- 반응형 ---------- */
+/* =========================================================
+   5) 3D 가상 전시관
+   ========================================================= */
+#screen-3d{position:fixed; inset:0; z-index:40; background:#000;}
+#three-canvas-wrap{position:absolute; inset:0;}
+#three-canvas-wrap canvas{display:block; width:100%; height:100%; touch-action:none;}
+#three-hint{
+  position:absolute; top:16px; left:50%; transform:translateX(-50%);
+  background:rgba(33,31,28,0.72); color:#fff; padding:9px 18px; border-radius:999px;
+  font-size:0.8rem; white-space:nowrap; max-width:92vw; text-align:center;
+  pointer-events:none; z-index:5;
+}
+#three-exit-btn{
+  position:absolute; top:14px; right:14px; z-index:6; background:rgba(255,255,255,0.92);
+}
+#three-move-pad{
+  position:absolute; bottom:24px; left:24px; z-index:6;
+  display:grid; grid-template-areas:". up ." "left . right" ". down .";
+  grid-template-columns:54px 54px 54px; grid-template-rows:54px 54px 54px; gap:6px;
+}
+.three-move-btn{
+  width:54px; height:54px; border-radius:14px; border:none; font-size:1.3rem; font-weight:700;
+  background:rgba(255,255,255,0.85); color:var(--ink); box-shadow:0 4px 10px rgba(0,0,0,0.3);
+  touch-action:none; user-select:none;
+}
+.three-move-btn:active{background:var(--brass); color:#fff;}
+
 @media (max-width:640px){
   .gallery-grid{grid-template-columns:1fr; gap:28px;}
   .entrance-card{padding:40px 24px;}
   .admin-list-item{flex-direction:column; align-items:flex-start;}
+  #three-move-pad{bottom:18px; left:14px;}
 }
 </style>
 </head>
@@ -286,6 +315,7 @@ button{font-family:inherit; cursor:pointer;}
     <p class="entrance-desc">사진, 그림, 영상 작품을 감상하고<br>서로의 생각을 댓글로 남겨보세요.</p>
     <div class="entrance-actions">
       <button class="btn btn-primary" onclick="enterGallery()">전시회 입장하기</button>
+      <button class="btn btn-brass" onclick="enter3D()">🚶 3D로 둘러보기</button>
       <button class="btn btn-ghost" onclick="openAdminLogin()">관리자 모드</button>
     </div>
   </div>
@@ -300,6 +330,7 @@ button{font-family:inherit; cursor:pointer;}
       <h2 class="gallery-title">🖼 우리 반 온라인 전시회</h2>
       <div class="gallery-header-actions">
         <button class="btn btn-ghost btn-small" onclick="goEntrance()">처음으로</button>
+        <button class="btn btn-brass btn-small" onclick="enter3D()">🚶 3D로 보기</button>
         <button class="btn btn-brass btn-small" onclick="openAdminLogin()">관리자 모드</button>
       </div>
     </div>
@@ -426,6 +457,26 @@ button{font-family:inherit; cursor:pointer;}
   </div>
 </div>
 
+<!-- =========================================================
+     화면 4: 3D 가상 전시관 (걸어다니며 구경하기)
+     ========================================================= -->
+<div id="screen-3d" class="hidden">
+  <div id="three-canvas-wrap"></div>
+
+  <div id="three-hint">
+    📱 화면을 드래그하면 시선이 움직여요 · 작품을 톡 터치하면 자세히 볼 수 있어요
+  </div>
+
+  <button class="btn btn-ghost btn-small" id="three-exit-btn" onclick="exit3D()">✕ 나가기</button>
+
+  <div id="three-move-pad">
+    <button class="three-move-btn" id="btn-forward" style="grid-area:up;">▲</button>
+    <button class="three-move-btn" id="btn-left" style="grid-area:left;">◀</button>
+    <button class="three-move-btn" id="btn-right" style="grid-area:right;">▶</button>
+    <button class="three-move-btn" id="btn-back" style="grid-area:down;">▼</button>
+  </div>
+</div>
+
 <div id="toast"></div>
 <div class="watermark">made by 박선생</div>
 
@@ -548,6 +599,9 @@ function refreshCurrentScreen(){
   if(!document.getElementById("screen-admin").classList.contains("hidden")){
     renderAdminList();
   }
+  if(!document.getElementById("screen-3d").classList.contains("hidden") && threeRenderer){
+    buildGalleryScene();
+  }
   if(!document.getElementById("modal-detail").classList.contains("hidden") && currentDetailId){
     refreshDetailModal();
   }
@@ -623,7 +677,7 @@ function seedIfEmptyOnce(){
    화면 전환
    --------------------------------------------------------- */
 function show(id){
-  ["screen-entrance","screen-gallery","screen-admin"].forEach(s=>{
+  ["screen-entrance","screen-gallery","screen-admin","screen-3d"].forEach(s=>{
     document.getElementById(s).classList.toggle("hidden", s !== id);
   });
 }
@@ -1114,6 +1168,363 @@ function resetAllData(){
   if(!confirm("모든 작품, 댓글, 감상 기록이 삭제되고 예시 작품만 남습니다.\n정말 초기화하시겠습니까?")) return;
   seedDefaultArtworks();
   showToast("전체 데이터가 초기화되었습니다.");
+}
+
+
+/* =========================================================
+   ■ 3D 가상 전시관 (Three.js)
+   - 작품을 두 벽(좌/우)에 번갈아 배치한 직사각형 전시실
+   - 이동: 키보드 WASD 또는 화면의 방향 버튼
+   - 시선: 화면을 드래그(마우스/터치 공통)
+   - 작품 보기: 드래그 없이 톡 터치/클릭 → 기존 상세보기 모달 사용
+   ========================================================= */
+let threeRenderer = null, threeScene = null, threeCamera = null, threeGalleryGroup = null;
+let threeAnimId = null, threeControlsReady = false;
+let playerPos = {x:0, y:1.6, z:-1};
+let playerYaw = 0, playerPitch = 0;
+let moveState = {forward:false, back:false, left:false, right:false};
+let dragState = {active:false, moved:false, lastX:0, lastY:0, startX:0, startY:0};
+let interactiveMeshes = [];
+const ROOM_HALF_WIDTH = 5.5;
+let roomLength = 20;
+let lastFrameTime = performance.now();
+
+function enter3D(){
+  if(typeof THREE === "undefined"){
+    showToast("⚠️ 3D 라이브러리를 불러오지 못했어요. 인터넷 연결을 확인해주세요.");
+    return;
+  }
+  show("screen-3d");
+  showToast("3D 전시관을 불러오는 중이에요 🏛");
+  if(!threeRenderer) initThreeRenderer();
+  if(!threeControlsReady) setupThreeControls();
+  buildGalleryScene();
+  playerPos = {x:0, y:1.6, z:-1};
+  playerYaw = 0; playerPitch = 0;
+  requestAnimationFrame(resizeThree);
+  startRenderLoop();
+}
+function exit3D(){
+  stopRenderLoop();
+  show("screen-gallery");
+  renderGallery();
+}
+
+function initThreeRenderer(){
+  const wrap = document.getElementById("three-canvas-wrap");
+  threeRenderer = new THREE.WebGLRenderer({antialias:true});
+  threeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  wrap.appendChild(threeRenderer.domElement);
+
+  threeScene = new THREE.Scene();
+  threeScene.background = new THREE.Color(0xece6d8);
+
+  threeCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 200);
+  threeCamera.rotation.order = "YXZ";
+
+  threeScene.add(new THREE.AmbientLight(0xffffff, 0.7));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  dirLight.position.set(4, 10, 4);
+  threeScene.add(dirLight);
+
+  resizeThree();
+  window.addEventListener("resize", resizeThree);
+}
+
+function resizeThree(){
+  if(!threeRenderer || !threeCamera) return;
+  const wrap = document.getElementById("three-canvas-wrap");
+  const w = wrap.clientWidth || window.innerWidth;
+  const h = wrap.clientHeight || window.innerHeight;
+  threeRenderer.setSize(w, h);
+  threeCamera.aspect = w / h;
+  threeCamera.updateProjectionMatrix();
+}
+
+/* ---------------------------------------------------------
+   전시실 + 작품 액자 만들기 (작품 데이터가 바뀌면 다시 호출됨)
+   --------------------------------------------------------- */
+function buildGalleryScene(){
+  if(!threeScene) return;
+  if(threeGalleryGroup){
+    threeScene.remove(threeGalleryGroup);
+    disposeGroup(threeGalleryGroup);
+  }
+  threeGalleryGroup = new THREE.Group();
+  interactiveMeshes = [];
+
+  const artworks = getArtworksArray().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  const spacing = 5;
+  roomLength = Math.max(20, 4 + Math.ceil(Math.max(artworks.length,1)/2) * spacing + 4);
+
+  // 바닥
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROOM_HALF_WIDTH*2, roomLength),
+    new THREE.MeshStandardMaterial({color:0xD8CBB0})
+  );
+  floor.rotation.x = -Math.PI/2;
+  floor.position.set(0, 0, roomLength/2 - 2);
+  threeGalleryGroup.add(floor);
+
+  // 천장
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROOM_HALF_WIDTH*2, roomLength),
+    new THREE.MeshStandardMaterial({color:0xF3EEE2})
+  );
+  ceiling.rotation.x = Math.PI/2;
+  ceiling.position.set(0, 3.4, roomLength/2 - 2);
+  threeGalleryGroup.add(ceiling);
+
+  // 벽 4면
+  const wallMat = new THREE.MeshStandardMaterial({color:0xEDE6D6});
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, roomLength), wallMat);
+  leftWall.position.set(-ROOM_HALF_WIDTH, 1.7, roomLength/2 - 2);
+  threeGalleryGroup.add(leftWall);
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, roomLength), wallMat);
+  rightWall.position.set(ROOM_HALF_WIDTH, 1.7, roomLength/2 - 2);
+  threeGalleryGroup.add(rightWall);
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_HALF_WIDTH*2, 3.4, 0.2), wallMat);
+  backWall.position.set(0, 1.7, roomLength - 2);
+  threeGalleryGroup.add(backWall);
+  const frontWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_HALF_WIDTH*2, 3.4, 0.2), wallMat);
+  frontWall.position.set(0, 1.7, -2);
+  threeGalleryGroup.add(frontWall);
+
+  // 작품 액자 (좌/우 벽에 번갈아 배치)
+  artworks.forEach((art, i)=>{
+    const side = i % 2 === 0 ? -1 : 1;
+    const z = 4 + Math.floor(i/2) * spacing;
+    const x = side * (ROOM_HALF_WIDTH - 0.1);
+    const rotY = side === -1 ? Math.PI/2 : -Math.PI/2;
+    threeGalleryGroup.add(createFrameMesh(art, x, z, rotY));
+  });
+
+  threeScene.add(threeGalleryGroup);
+}
+
+function disposeGroup(group){
+  group.traverse(obj=>{
+    if(obj.geometry) obj.geometry.dispose();
+    if(obj.material){
+      if(obj.material.map) obj.material.map.dispose();
+      obj.material.dispose();
+    }
+  });
+}
+
+function createFrameMesh(art, x, z, rotY){
+  const group = new THREE.Group();
+
+  const frameMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 1.7, 0.12),
+    new THREE.MeshStandardMaterial({color:0x9C7A3F})
+  );
+  group.add(frameMesh);
+
+  const artMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.9, 1.4),
+    new THREE.MeshBasicMaterial({map: buildArtworkTexture(art)})
+  );
+  artMesh.position.z = 0.07;
+  group.add(artMesh);
+
+  const plaqueMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.6, 0.32),
+    new THREE.MeshBasicMaterial({map: buildPlaqueTexture(art)})
+  );
+  plaqueMesh.position.set(0, -1.05, 0.07);
+  group.add(plaqueMesh);
+
+  group.position.set(x, 1.75, z);
+  group.rotation.y = rotY;
+
+  interactiveMeshes.push({mesh: artMesh, id: art.id});
+  interactiveMeshes.push({mesh: frameMesh, id: art.id});
+  return group;
+}
+
+function extractGradientColors(gradStr){
+  const matches = gradStr ? gradStr.match(/#[0-9A-Fa-f]{6}/g) : null;
+  if(!matches || matches.length < 2) return ["#cccccc", "#999999"];
+  return matches;
+}
+
+function buildArtworkTexture(art){
+  const canvas = document.createElement("canvas");
+  canvas.width = 256; canvas.height = 192;
+  const ctx = canvas.getContext("2d");
+  drawArtPlaceholder(ctx, art, canvas.width, canvas.height);
+  const texture = new THREE.CanvasTexture(canvas);
+
+  // 실제 이미지 파일이 있으면(동영상 제외) 비동기로 그려서 텍스처를 교체
+  if(art.fileData && art.type !== "video"){
+    const img = new Image();
+    img.onload = function(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      texture.needsUpdate = true;
+    };
+    img.onerror = function(){ /* 그림이 깨져도 placeholder 유지 */ };
+    img.src = art.fileData;
+  }
+  return texture;
+}
+
+function drawArtPlaceholder(ctx, art, w, h){
+  const colors = extractGradientColors(art.thumbGradient);
+  const grad = ctx.createLinearGradient(0,0,w,h);
+  grad.addColorStop(0, colors[0]);
+  grad.addColorStop(1, colors[1]);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,w,h);
+  ctx.font = "70px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const icon = art.type === "video" ? "🎬" : art.type === "painting" ? "🎨" : "📷";
+  ctx.fillText(icon, w/2, h/2);
+}
+
+function buildPlaqueTexture(art){
+  const canvas = document.createElement("canvas");
+  canvas.width = 320; canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#211F1C";
+  ctx.fillRect(0,0,320,64);
+  ctx.fillStyle = "#EFE6CE";
+  ctx.font = "bold 22px 'Noto Sans KR', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText((art.title||"").slice(0,14), 160, 26);
+  ctx.fillStyle = "#C9B98C";
+  ctx.font = "15px 'Noto Sans KR', sans-serif";
+  ctx.fillText((art.artist||"").slice(0,12) + " · " + typeLabel(art.type), 160, 48);
+  return new THREE.CanvasTexture(canvas);
+}
+
+/* ---------------------------------------------------------
+   입력 처리: 키보드, 화면 버튼, 드래그 시선, 탭으로 작품 보기
+   --------------------------------------------------------- */
+function setupThreeControls(){
+  threeControlsReady = true;
+
+  window.addEventListener("keydown", e=>{
+    if(document.getElementById("screen-3d").classList.contains("hidden")) return;
+    setKeyMove(e.key, true);
+  });
+  window.addEventListener("keyup", e=>{
+    setKeyMove(e.key, false);
+  });
+
+  bindMoveButton("btn-forward", "forward");
+  bindMoveButton("btn-back", "back");
+  bindMoveButton("btn-left", "left");
+  bindMoveButton("btn-right", "right");
+
+  const wrap = document.getElementById("three-canvas-wrap");
+  wrap.addEventListener("pointerdown", e=>{
+    dragState.active = true; dragState.moved = false;
+    dragState.lastX = e.clientX; dragState.lastY = e.clientY;
+    dragState.startX = e.clientX; dragState.startY = e.clientY;
+  });
+  wrap.addEventListener("pointermove", e=>{
+    if(!dragState.active) return;
+    const dx = e.clientX - dragState.lastX;
+    const dy = e.clientY - dragState.lastY;
+    if(Math.abs(e.clientX - dragState.startX) > 6 || Math.abs(e.clientY - dragState.startY) > 6){
+      dragState.moved = true;
+    }
+    playerYaw -= dx * 0.0035;
+    playerPitch -= dy * 0.0035;
+    playerPitch = Math.max(-1.3, Math.min(1.3, playerPitch));
+    dragState.lastX = e.clientX; dragState.lastY = e.clientY;
+  });
+  wrap.addEventListener("pointerup", e=>{
+    if(dragState.active && !dragState.moved){
+      handleSceneTap(e.clientX, e.clientY);
+    }
+    dragState.active = false;
+  });
+  wrap.addEventListener("pointercancel", ()=>{ dragState.active = false; });
+}
+
+function setKeyMove(key, isDown){
+  if(key === "w" || key === "W" || key === "ArrowUp") moveState.forward = isDown;
+  if(key === "s" || key === "S" || key === "ArrowDown") moveState.back = isDown;
+  if(key === "a" || key === "A" || key === "ArrowLeft") moveState.left = isDown;
+  if(key === "d" || key === "D" || key === "ArrowRight") moveState.right = isDown;
+}
+
+function bindMoveButton(id, key){
+  const el = document.getElementById(id);
+  if(!el) return;
+  const on = e=>{ e.preventDefault(); moveState[key] = true; };
+  const off = ()=>{ moveState[key] = false; };
+  el.addEventListener("pointerdown", on);
+  el.addEventListener("pointerup", off);
+  el.addEventListener("pointerleave", off);
+  el.addEventListener("pointercancel", off);
+}
+
+function handleSceneTap(clientX, clientY){
+  const wrap = document.getElementById("three-canvas-wrap");
+  const rect = wrap.getBoundingClientRect();
+  const x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  const y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera({x, y}, threeCamera);
+  const meshes = interactiveMeshes.map(o=>o.mesh);
+  const hits = raycaster.intersectObjects(meshes);
+  if(hits.length > 0){
+    const found = interactiveMeshes.find(o=>o.mesh === hits[0].object);
+    if(found) openDetail(found.id);
+  }
+}
+
+/* ---------------------------------------------------------
+   이동 계산 + 렌더 루프
+   --------------------------------------------------------- */
+function updateMovement(delta){
+  const speed = 4.2 * delta;
+  const dir = new THREE.Vector3();
+  threeCamera.getWorldDirection(dir);
+  dir.y = 0; dir.normalize();
+  const right = new THREE.Vector3().crossVectors(dir, threeCamera.up).normalize();
+
+  let mx = 0, mz = 0;
+  if(moveState.forward){ mx += dir.x; mz += dir.z; }
+  if(moveState.back){ mx -= dir.x; mz -= dir.z; }
+  if(moveState.right){ mx += right.x; mz += right.z; }
+  if(moveState.left){ mx -= right.x; mz -= right.z; }
+
+  const len = Math.hypot(mx, mz);
+  if(len > 0){
+    mx /= len; mz /= len;
+    playerPos.x += mx * speed;
+    playerPos.z += mz * speed;
+    playerPos.x = Math.max(-ROOM_HALF_WIDTH + 0.6, Math.min(ROOM_HALF_WIDTH - 0.6, playerPos.x));
+    playerPos.z = Math.max(-1.6, Math.min(roomLength - 2.4, playerPos.z));
+  }
+  threeCamera.position.set(playerPos.x, 1.6, playerPos.z);
+}
+
+function renderLoop(){
+  threeAnimId = requestAnimationFrame(renderLoop);
+  const now = performance.now();
+  const delta = Math.min((now - lastFrameTime) / 1000, 0.1);
+  lastFrameTime = now;
+
+  threeCamera.rotation.y = playerYaw;
+  threeCamera.rotation.x = playerPitch;
+  updateMovement(delta);
+  threeRenderer.render(threeScene, threeCamera);
+}
+function startRenderLoop(){
+  lastFrameTime = performance.now();
+  if(threeAnimId) cancelAnimationFrame(threeAnimId);
+  renderLoop();
+}
+function stopRenderLoop(){
+  if(threeAnimId) cancelAnimationFrame(threeAnimId);
+  threeAnimId = null;
 }
 
 /* ---------------------------------------------------------
