@@ -511,6 +511,11 @@ button{font-family:inherit; cursor:pointer;}
         <div class="preview-box" id="file-preview-box">미리보기</div>
         <div class="file-warning">⚠️ 이미지 용량이 너무 크면 브라우저 저장 용량 초과로 저장이 안 될 수 있어요. 너무 큰 사진은 줄여서 올려주세요.</div>
       </div>
+      <div>
+        <label>배치 순서 (3D 전시관)</label>
+        <input type="number" id="f-manual-slot" min="1" step="1" placeholder="비워두면 자동 배치">
+        <div class="file-warning" style="color:var(--ink-soft);">숫자를 적으면 그 번째 자리에 고정되고, 비워두면 남은 자리에 자동으로 배치돼요. 일부 작품만 번호를 정하고 나머지는 비워두는 것도 가능해요.</div>
+      </div>
       <div style="display:flex; gap:10px;">
         <button class="btn btn-primary" onclick="saveArtworkForm()">저장하기</button>
         <button class="btn btn-ghost hidden" id="cancel-edit-btn" onclick="resetForm()">수정 취소</button>
@@ -797,7 +802,7 @@ function refreshCurrentScreen(){
     renderGridEditor();
   }
   if(!document.getElementById("screen-3d").classList.contains("hidden") && threeRenderer){
-    buildGalleryScene();
+    try{ buildGalleryScene(); }catch(err){ console.error("3D 전시관 갱신 오류:", err); }
   }
   if(!document.getElementById("modal-detail").classList.contains("hidden") && currentDetailId){
     refreshDetailModal();
@@ -1166,6 +1171,7 @@ function resetForm(){
   document.getElementById("f-type").value = "photo";
   document.getElementById("f-desc").value = "";
   document.getElementById("f-file").value = "";
+  document.getElementById("f-manual-slot").value = "";
   document.getElementById("file-preview-box").innerHTML = "미리보기";
   document.getElementById("form-title").textContent = "➕ 새 작품 추가";
   document.getElementById("cancel-edit-btn").classList.add("hidden");
@@ -1180,6 +1186,8 @@ function saveArtworkForm(){
   const artist = document.getElementById("f-artist").value.trim();
   const type = document.getElementById("f-type").value;
   const desc = document.getElementById("f-desc").value.trim();
+  const slotRaw = document.getElementById("f-manual-slot").value.trim();
+  const manualSlot = slotRaw ? Math.max(1, parseInt(slotRaw, 10)) : null;
 
   if(!title || !artist || !desc){
     showToast("제목, 작가 이름, 설명을 모두 입력해주세요.");
@@ -1188,7 +1196,7 @@ function saveArtworkForm(){
 
   if(id){
     // 수정
-    const updateObj = { title, artist, type, desc };
+    const updateObj = { title, artist, type, desc, manualSlot };
     if(pendingFileData) updateObj.fileData = pendingFileData;
     if(pendingAspectRatio) updateObj.aspectRatio = pendingAspectRatio;
     db.ref("artworks/" + id).update(updateObj)
@@ -1202,7 +1210,7 @@ function saveArtworkForm(){
     // 추가
     const newId = generateId();
     const newArt = {
-      title, artist, type, desc,
+      title, artist, type, desc, manualSlot,
       fileData: pendingFileData || null,
       aspectRatio: pendingAspectRatio || null,
       thumbGradient: "linear-gradient(135deg,#B7A6D6,#7C6BA0)",
@@ -1227,6 +1235,7 @@ function startEditArtwork(id){
   document.getElementById("f-type").value = a.type;
   document.getElementById("f-desc").value = a.desc;
   document.getElementById("f-file").value = "";
+  document.getElementById("f-manual-slot").value = a.manualSlot ? a.manualSlot : "";
   pendingFileData = null;
   pendingAspectRatio = null;
   const previewBox = document.getElementById("file-preview-box");
@@ -1294,7 +1303,7 @@ function renderAdminList(){
           <div class="admin-thumb">${thumb}</div>
           <div class="admin-list-info">
             <b>${escapeHtml(a.title)}</b>
-            <span>${escapeHtml(a.artist)} · ${typeLabel(a.type)} · 댓글 ${cList.length}개</span>
+            <span>${escapeHtml(a.artist)} · ${typeLabel(a.type)} · 댓글 ${cList.length}개 · 배치 ${a.manualSlot ? (a.manualSlot+"번 고정") : "자동"}</span>
           </div>
           <div class="admin-list-actions">
             <button class="btn btn-ghost btn-small" onclick="startEditArtwork('${a.id}')">수정</button>
@@ -2079,7 +2088,12 @@ function enter3D(){
   showToast("3D 전시관을 불러오는 중이에요 🏛");
   if(!threeRenderer) initThreeRenderer();
   if(!threeControlsReady) setupThreeControls();
-  buildGalleryScene();
+  try{
+    buildGalleryScene();
+  }catch(err){
+    console.error("3D 전시관 생성 오류:", err);
+    showToast("⚠️ 전시관을 만드는 중 오류가 발생했어요. 구조 설정을 확인해주세요.");
+  }
   if((cachedGalleryLayout || "corridor") === "custom"){
     playerPos = {x: gridCellWorldX(ENTRY_COL), y:1.6, z: gridCellWorldZ(ENTRY_ROW)};
     playerYaw = Math.PI; // 입구에서 전시장 안쪽(격자 row가 커지는 방향)을 보도록
@@ -2272,6 +2286,27 @@ function buildCustomGridShell(group, theme, grid, yOffset, skipCeiling){
 }
 
 // 격자 벽 중 옆이 빈 칸(걸어 다닐 수 있는 칸)인 면을 찾아 그 면에 작품을 겁니다.
+// 작품 배열과 자리(슬롯) 배열을 받아서, manualSlot(수동 지정 번호)이 있는 작품은 그 자리에,
+// 나머지(자동) 작품은 비어있는 자리에 순서대로 채워줍니다. 혼합 사용 가능.
+function assignArtworksToSlots(artworks, slotCount){
+  const result = new Array(slotCount).fill(null);
+  const autoQueue = [];
+  artworks.forEach(art=>{
+    const want = (typeof art.manualSlot === "number" && art.manualSlot >= 1 && art.manualSlot <= slotCount)
+      ? art.manualSlot - 1 : null;
+    if(want !== null && result[want] === null){
+      result[want] = art;
+    }else{
+      autoQueue.push(art);
+    }
+  });
+  let qi = 0;
+  for(let i=0; i<result.length && qi<autoQueue.length; i++){
+    if(result[i] === null){ result[i] = autoQueue[qi++]; }
+  }
+  return result;
+}
+
 function placeFramesGrid(group, artworks, theme, yOffset, grid){
   const faces = [];
   for(let r=0; r<GRID_ROWS; r++){
@@ -2298,20 +2333,23 @@ function placeFramesGrid(group, artworks, theme, yOffset, grid){
 
   if(faces.length === 0 || artworks.length === 0) return;
 
-  // 작품보다 걸 수 있는 면이 더 많으면, 한쪽에 몰리지 않도록 고르게 골라서 배치
-  let chosen;
+  // 작품보다 걸 수 있는 면이 더 많으면, 한쪽에 몰리지 않도록 고르게 골라서 슬롯으로 사용
+  let slots;
   if(faces.length <= artworks.length){
-    chosen = faces;
+    slots = faces;
   }else{
-    chosen = [];
+    slots = [];
     const step = faces.length / artworks.length;
     for(let i=0; i<artworks.length; i++){
-      chosen.push(faces[Math.floor(i*step)]);
+      slots.push(faces[Math.floor(i*step)]);
     }
   }
-  chosen.forEach((f, i)=>{
-    if(!artworks[i]) return;
-    group.add(createFrameMesh(artworks[i], f.x, yOffset+1.75, f.z, f.rotY, theme.frame));
+
+  const assigned = assignArtworksToSlots(artworks, slots.length);
+  assigned.forEach((art, i)=>{
+    if(!art) return;
+    const s = slots[i];
+    group.add(createFrameMesh(art, s.x, yOffset+1.75, s.z, s.rotY, theme.frame));
   });
 }
 
@@ -2350,34 +2388,56 @@ function buildRoomShell(group, theme, hw, roomLen, yOffset, skipCeiling){
   group.add(frontWall);
 }
 
-// 복도형: 좌/우 벽에 번갈아 배치
+// 복도형: 좌/우 벽에 번갈아 배치될 "자리" 목록을 만든 뒤, 수동 지정 번호가 있으면 그 자리에 고정
 function placeFramesCorridor(group, artworks, theme, yOffset, hw){
   const spacing = 5;
-  artworks.forEach((art, i)=>{
+  const n = artworks.length;
+  const slots = [];
+  for(let i=0; i<n; i++){
     const side = i % 2 === 0 ? -1 : 1;
     const z = 4 + Math.floor(i/2) * spacing;
     const x = side * (hw - 0.1);
     const rotY = side === -1 ? Math.PI/2 : -Math.PI/2;
-    group.add(createFrameMesh(art, x, yOffset + 1.75, z, rotY, theme.frame));
+    slots.push({x, z, rotY});
+  }
+  const assigned = assignArtworksToSlots(artworks, slots.length);
+  assigned.forEach((art, i)=>{
+    if(!art) return;
+    const s = slots[i];
+    group.add(createFrameMesh(art, s.x, yOffset + 1.75, s.z, s.rotY, theme.frame));
   });
 }
 
-// 사각형 홀형: 입구(앞벽)를 비우고 좌/뒤/우 3개 벽 둘레를 따라 균등 배치
+// 사각형 홀형: 입구(앞벽)를 비우고 좌/뒤/우 3개 벽 둘레를 따라 자리를 만든 뒤 수동/자동 배정
 function placeFramesHall(group, artworks, theme, yOffset, hw, roomLen){
-  const buckets = [[], [], []]; // 0:왼쪽벽, 1:뒤쪽벽, 2:오른쪽벽
-  artworks.forEach((art, i)=> buckets[i % 3].push(art));
+  const n = artworks.length;
+  const counts = [0, 0, 0]; // 0:왼쪽벽, 1:뒤쪽벽, 2:오른쪽벽
+  for(let i=0; i<n; i++) counts[i % 3]++;
 
-  buckets[0].forEach((art, idx)=>{
-    const z = 3 + (idx+1) * ((roomLen-6) / (buckets[0].length+1));
-    group.add(createFrameMesh(art, -(hw-0.1), yOffset+1.75, z, Math.PI/2, theme.frame));
-  });
-  buckets[2].forEach((art, idx)=>{
-    const z = 3 + (idx+1) * ((roomLen-6) / (buckets[2].length+1));
-    group.add(createFrameMesh(art, (hw-0.1), yOffset+1.75, z, -Math.PI/2, theme.frame));
-  });
-  buckets[1].forEach((art, idx)=>{
-    const x = -(hw-1) + (idx+1) * ((hw*2-2) / (buckets[1].length+1));
-    group.add(createFrameMesh(art, x, yOffset+1.75, roomLen-2-0.1, Math.PI, theme.frame));
+  const slots = new Array(n);
+  let idxLeft = 0, idxBack = 0, idxRight = 0;
+  for(let i=0; i<n; i++){
+    const bucket = i % 3;
+    if(bucket === 0){
+      const z = 3 + (idxLeft+1) * ((roomLen-6) / (counts[0]+1));
+      slots[i] = { x:-(hw-0.1), z, rotY:Math.PI/2 };
+      idxLeft++;
+    }else if(bucket === 2){
+      const z = 3 + (idxRight+1) * ((roomLen-6) / (counts[2]+1));
+      slots[i] = { x:(hw-0.1), z, rotY:-Math.PI/2 };
+      idxRight++;
+    }else{
+      const x = -(hw-1) + (idxBack+1) * ((hw*2-2) / (counts[1]+1));
+      slots[i] = { x, z: roomLen-2-0.1, rotY: Math.PI };
+      idxBack++;
+    }
+  }
+
+  const assigned = assignArtworksToSlots(artworks, slots.length);
+  assigned.forEach((art, i)=>{
+    if(!art) return;
+    const s = slots[i];
+    group.add(createFrameMesh(art, s.x, yOffset+1.75, s.z, s.rotY, theme.frame));
   });
 }
 
@@ -2436,6 +2496,15 @@ function createFrameMesh(art, x, y, z, rotY, frameColor){
   );
   plaqueMesh.position.set(0, -(dims.h/2 + 0.35), 0.07);
   group.add(plaqueMesh);
+
+  // 작품 전용 조명: 액자 위쪽 앞에서 작품을 향해 비추는 작은 스포트라이트
+  const spotlight = new THREE.SpotLight(0xFFF1DC, 1.1, 4.5, Math.PI/5, 0.5, 1.5);
+  spotlight.position.set(0, dims.h/2 + 0.5, 0.9);
+  const spotTarget = new THREE.Object3D();
+  spotTarget.position.set(0, 0, 0.07);
+  group.add(spotTarget);
+  spotlight.target = spotTarget;
+  group.add(spotlight);
 
   group.position.set(x, y, z);
   group.rotation.y = rotY;
@@ -2679,6 +2748,7 @@ function renderLoop(){
 
   threeCamera.rotation.y = playerYaw;
   threeCamera.rotation.x = playerPitch;
+  threeCamera.updateMatrixWorld(true); // 회전을 즉시 반영해야 이동 방향(getWorldDirection)이 같은 프레임에 정확해짐
   updateMovement(delta);
   threeRenderer.render(threeScene, threeCamera);
 }
