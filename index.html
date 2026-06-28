@@ -2306,7 +2306,7 @@ function buildCustomGridShell(group, theme, grid, yOffset, skipCeiling){
 
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(widthX, depthZ),
-    new THREE.MeshStandardMaterial({color:theme.floor})
+    new THREE.MeshStandardMaterial({color:theme.floor, side:THREE.DoubleSide})
   );
   floor.rotation.x = -Math.PI/2;
   floor.position.set(0, yOffset, centerZ);
@@ -2315,7 +2315,7 @@ function buildCustomGridShell(group, theme, grid, yOffset, skipCeiling){
   if(!skipCeiling){
     const ceiling = new THREE.Mesh(
       new THREE.PlaneGeometry(widthX, depthZ),
-      new THREE.MeshStandardMaterial({color:theme.ceiling})
+      new THREE.MeshStandardMaterial({color:theme.ceiling, side:THREE.DoubleSide})
     );
     ceiling.rotation.x = Math.PI/2;
     ceiling.position.set(0, yOffset + WALL_HEIGHT, centerZ);
@@ -2415,7 +2415,7 @@ function placeFramesGrid(group, artworks, theme, yOffset, grid){
 function buildRoomShell(group, theme, hw, roomLen, yOffset, skipCeiling){
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(hw*2, roomLen),
-    new THREE.MeshStandardMaterial({color:theme.floor})
+    new THREE.MeshStandardMaterial({color:theme.floor, side:THREE.DoubleSide})
   );
   floor.rotation.x = -Math.PI/2;
   floor.position.set(0, yOffset, roomLen/2 - 2);
@@ -2424,7 +2424,7 @@ function buildRoomShell(group, theme, hw, roomLen, yOffset, skipCeiling){
   if(!skipCeiling){
     const ceiling = new THREE.Mesh(
       new THREE.PlaneGeometry(hw*2, roomLen),
-      new THREE.MeshStandardMaterial({color:theme.ceiling})
+      new THREE.MeshStandardMaterial({color:theme.ceiling, side:THREE.DoubleSide})
     );
     ceiling.rotation.x = Math.PI/2;
     ceiling.position.set(0, yOffset + WALL_HEIGHT, roomLen/2 - 2);
