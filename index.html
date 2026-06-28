@@ -2477,9 +2477,14 @@ function createFrameMesh(art, x, y, z, rotY, frameColor){
   const group = new THREE.Group();
   const dims = getFrameDims(art);
 
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: frameColor != null ? frameColor : 0x9C7A3F,
+    emissive: 0x3A2A10,
+    emissiveIntensity: 0.35
+  });
   const frameMesh = new THREE.Mesh(
     new THREE.BoxGeometry(dims.w + 0.3, dims.h + 0.3, 0.12),
-    new THREE.MeshStandardMaterial({color: frameColor != null ? frameColor : 0x9C7A3F})
+    frameMat
   );
   group.add(frameMesh);
 
@@ -2497,14 +2502,23 @@ function createFrameMesh(art, x, y, z, rotY, frameColor){
   plaqueMesh.position.set(0, -(dims.h/2 + 0.35), 0.07);
   group.add(plaqueMesh);
 
-  // 작품 전용 조명: 액자 위쪽 앞에서 작품을 향해 비추는 작은 스포트라이트
-  const spotlight = new THREE.SpotLight(0xFFF1DC, 1.1, 4.5, Math.PI/5, 0.5, 1.5);
-  spotlight.position.set(0, dims.h/2 + 0.5, 0.9);
-  const spotTarget = new THREE.Object3D();
-  spotTarget.position.set(0, 0, 0.07);
-  group.add(spotTarget);
-  spotlight.target = spotTarget;
-  group.add(spotlight);
+  // 작품 조명 효과: 실제 동적 조명 대신 "조명 기구" 장식 + 은은한 빛줄기(half-transparent 메쉬)로 표현
+  // → 작품이 많아져도 실시간 조명 개수 제한 문제로 화면이 깨지지 않도록 안전하게 처리
+  const fixtureMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.09, 0.16, 10),
+    new THREE.MeshStandardMaterial({color:0x2B2B2B})
+  );
+  fixtureMesh.position.set(0, dims.h/2 + 0.42, 0.55);
+  fixtureMesh.rotation.x = Math.PI/2.6;
+  group.add(fixtureMesh);
+
+  const beamMesh = new THREE.Mesh(
+    new THREE.ConeGeometry(Math.max(dims.w, dims.h) * 0.42, dims.h * 0.85, 16, 1, true),
+    new THREE.MeshBasicMaterial({color:0xFFF1CC, transparent:true, opacity:0.10, side:THREE.DoubleSide, depthWrite:false})
+  );
+  beamMesh.position.set(0, dims.h/2 + 0.1, 0.45);
+  beamMesh.rotation.x = Math.PI;
+  group.add(beamMesh);
 
   group.position.set(x, y, z);
   group.rotation.y = rotY;
