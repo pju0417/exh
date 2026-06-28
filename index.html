@@ -2264,8 +2264,7 @@ function buildGalleryScene(){
 
     floorArtworkLists.forEach((list, floorIdx)=>{
       const yOffset = floorIdx * FLOOR_GAP;
-      const isTopFloor = floorIdx === floorCount - 1;
-      buildCustomGridShell(threeGalleryGroup, theme, grid, yOffset, !isTopFloor);
+      buildCustomGridShell(threeGalleryGroup, theme, grid, yOffset);
       placeFramesGrid(threeGalleryGroup, list, theme, yOffset, grid);
     });
   }else{
@@ -2285,8 +2284,7 @@ function buildGalleryScene(){
 
     floorArtworkLists.forEach((list, floorIdx)=>{
       const yOffset = floorIdx * FLOOR_GAP;
-      const isTopFloor = floorIdx === floorCount - 1;
-      buildRoomShell(threeGalleryGroup, theme, hw, roomLength, yOffset, !isTopFloor);
+      buildRoomShell(threeGalleryGroup, theme, hw, roomLength, yOffset);
       if(layoutId === "hall"){
         placeFramesHall(threeGalleryGroup, list, theme, yOffset, hw, roomLength);
       }else{
@@ -2299,7 +2297,7 @@ function buildGalleryScene(){
 }
 
 // "직접 설계(격자)" 구조의 바닥/천장/벽을 격자 데이터 그대로 생성
-function buildCustomGridShell(group, theme, grid, yOffset, skipCeiling){
+function buildCustomGridShell(group, theme, grid, yOffset){
   const widthX = GRID_COLS * CELL_SIZE;
   const depthZ = GRID_ROWS * CELL_SIZE;
   const centerZ = (GRID_ROWS - 1) * CELL_SIZE / 2;
@@ -2312,15 +2310,14 @@ function buildCustomGridShell(group, theme, grid, yOffset, skipCeiling){
   floor.position.set(0, yOffset, centerZ);
   group.add(floor);
 
-  if(!skipCeiling){
-    const ceiling = new THREE.Mesh(
-      new THREE.PlaneGeometry(widthX, depthZ),
-      new THREE.MeshStandardMaterial({color:theme.ceiling, side:THREE.DoubleSide})
-    );
-    ceiling.rotation.x = Math.PI/2;
-    ceiling.position.set(0, yOffset + WALL_HEIGHT, centerZ);
-    group.add(ceiling);
-  }
+  // 천장은 항상 만듭니다(위층이 있어도 생략하지 않음). 위층 바닥과 겹쳐서 깜빡이지 않도록 살짝 아래로 내림.
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(widthX, depthZ),
+    new THREE.MeshStandardMaterial({color:theme.ceiling, side:THREE.DoubleSide})
+  );
+  ceiling.rotation.x = Math.PI/2;
+  ceiling.position.set(0, yOffset + WALL_HEIGHT - 0.02, centerZ);
+  group.add(ceiling);
 
   const wallMat = new THREE.MeshStandardMaterial({color:theme.wall});
   for(let r=0; r<GRID_ROWS; r++){
@@ -2411,8 +2408,8 @@ function placeFramesGrid(group, artworks, theme, yOffset, grid){
   });
 }
 
-// 바닥/벽 + (최상층이 아니면) 천장을 만듦. skipCeiling이 true면 위층 바닥이 천장 역할을 대신함.
-function buildRoomShell(group, theme, hw, roomLen, yOffset, skipCeiling){
+// 바닥/벽/천장을 만듦. 천장은 위층이 있어도 항상 따로 만듭니다(겹치는 평면 하나로 때우지 않음).
+function buildRoomShell(group, theme, hw, roomLen, yOffset){
   const floor = new THREE.Mesh(
     new THREE.PlaneGeometry(hw*2, roomLen),
     new THREE.MeshStandardMaterial({color:theme.floor, side:THREE.DoubleSide})
@@ -2421,15 +2418,14 @@ function buildRoomShell(group, theme, hw, roomLen, yOffset, skipCeiling){
   floor.position.set(0, yOffset, roomLen/2 - 2);
   group.add(floor);
 
-  if(!skipCeiling){
-    const ceiling = new THREE.Mesh(
-      new THREE.PlaneGeometry(hw*2, roomLen),
-      new THREE.MeshStandardMaterial({color:theme.ceiling, side:THREE.DoubleSide})
-    );
-    ceiling.rotation.x = Math.PI/2;
-    ceiling.position.set(0, yOffset + WALL_HEIGHT, roomLen/2 - 2);
-    group.add(ceiling);
-  }
+  // 천장은 항상 만듭니다(위층이 있어도 생략하지 않음). 위층 바닥과 겹쳐서 깜빡이지 않도록 살짝 아래로 내림.
+  const ceiling = new THREE.Mesh(
+    new THREE.PlaneGeometry(hw*2, roomLen),
+    new THREE.MeshStandardMaterial({color:theme.ceiling, side:THREE.DoubleSide})
+  );
+  ceiling.rotation.x = Math.PI/2;
+  ceiling.position.set(0, yOffset + WALL_HEIGHT - 0.02, roomLen/2 - 2);
+  group.add(ceiling);
 
   const wallMat = new THREE.MeshStandardMaterial({color:theme.wall});
   const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, roomLen), wallMat);
@@ -2717,7 +2713,7 @@ function setupThreeControls(){
     }
     playerYaw -= dx * 0.0035;
     playerPitch -= dy * 0.0035;
-    playerPitch = Math.max(-1.3, Math.min(1.3, playerPitch));
+    playerPitch = Math.max(-1.5, Math.min(1.5, playerPitch));
     dragState.lastX = e.clientX; dragState.lastY = e.clientY;
   });
   wrap.addEventListener("pointerup", e=>{
