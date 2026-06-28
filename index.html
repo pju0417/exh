@@ -323,13 +323,58 @@ button{font-family:inherit; cursor:pointer;}
     <h1>우리 반 온라인 전시회</h1>
     <div class="entrance-divider"></div>
     <p class="entrance-desc">사진, 그림, 영상 작품을 감상하고<br>서로의 생각을 댓글로 남겨보세요.</p>
-    <div class="entrance-actions">
-      <button class="btn btn-primary" onclick="enterGallery()">전시회 입장하기</button>
-      <button class="btn btn-brass" onclick="enter3D()">🚶 3D로 둘러보기</button>
-      <button class="btn btn-brass" onclick="openSubmitForm()">✏️ 내 작품 전시 신청하기</button>
-      <button class="btn btn-ghost" onclick="openMySubmissions()">내 신청 확인하기</button>
-      <button class="btn btn-ghost" onclick="openAdminLogin()">관리자 모드</button>
+
+    <div id="visitor-login-gate" class="hidden">
+      <input type="text" id="visitor-name-input" placeholder="이름을 입력해주세요" maxlength="20"
+        style="width:100%; padding:12px 16px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin-bottom:8px; text-align:center; font-size:1rem;"
+        onkeydown="if(event.key==='Enter')document.getElementById('visitor-pin-input').focus()">
+      <input type="password" id="visitor-pin-input" placeholder="PIN 번호 4자리" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+        style="width:100%; padding:12px 16px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin-bottom:8px; text-align:center; font-size:1rem; letter-spacing:4px;"
+        onkeydown="if(event.key==='Enter')visitorLogin()">
+      <div id="visitor-login-error" style="color:var(--brick-dark); font-size:0.82rem; min-height:18px; margin-bottom:6px;"></div>
+      <button class="btn btn-primary btn-block" onclick="visitorLogin()">로그인하고 입장하기</button>
+      <p style="font-size:0.76rem; color:var(--ink-soft); margin-top:10px;">선생님께 받은 이름과 PIN 번호로 입장해주세요.</p>
     </div>
+
+    <div id="visitor-nickname-setup" class="hidden">
+      <p style="font-size:0.88rem; color:var(--ink); margin-bottom:10px;">처음 오셨네요! 댓글에 사용할 닉네임을 정해주세요. (본명이 아니어도 괜찮아요)</p>
+      <input type="text" id="visitor-nickname-setup-input" placeholder="닉네임을 정해주세요" maxlength="20"
+        style="width:100%; padding:12px 16px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin-bottom:8px; text-align:center; font-size:1rem;"
+        onkeydown="if(event.key==='Enter')submitInitialNickname()">
+      <div id="visitor-nickname-setup-error" style="color:var(--brick-dark); font-size:0.82rem; min-height:18px; margin-bottom:6px;"></div>
+      <button class="btn btn-primary btn-block" onclick="submitInitialNickname()">닉네임 정하고 입장하기</button>
+    </div>
+
+    <div id="entrance-actions-box">
+      <div id="visitor-name-badge" style="font-size:0.82rem; color:var(--ink-soft); margin-bottom:8px;"></div>
+      <div id="visitor-profile-actions" style="display:flex; gap:8px; justify-content:center; margin-bottom:12px;"></div>
+
+      <div id="nickname-edit-box" class="hidden" style="margin-bottom:12px;">
+        <input type="text" id="nickname-edit-input" placeholder="새 닉네임" maxlength="20"
+          style="width:100%; padding:10px 14px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin-bottom:6px; text-align:center;">
+        <div id="nickname-edit-error" style="color:var(--brick-dark); font-size:0.8rem; min-height:16px; margin-bottom:4px;"></div>
+        <button class="btn btn-primary btn-small btn-block" onclick="saveNicknameEdit()">닉네임 저장</button>
+      </div>
+
+      <div id="pin-edit-box" class="hidden" style="margin-bottom:12px;">
+        <input type="password" id="pin-edit-input1" placeholder="새 PIN 4자리" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+          style="width:100%; padding:10px 14px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin-bottom:6px; text-align:center; letter-spacing:4px;">
+        <input type="password" id="pin-edit-input2" placeholder="새 PIN 다시 입력" maxlength="4" inputmode="numeric" pattern="[0-9]*"
+          style="width:100%; padding:10px 14px; border-radius:10px; border:1.5px solid rgba(0,0,0,0.15); margin-bottom:6px; text-align:center; letter-spacing:4px;">
+        <div id="pin-edit-error" style="color:var(--brick-dark); font-size:0.8rem; min-height:16px; margin-bottom:4px;"></div>
+        <button class="btn btn-primary btn-small btn-block" onclick="savePinEdit()">PIN 저장</button>
+      </div>
+
+      <div class="entrance-actions">
+        <button class="btn btn-primary" onclick="enterGallery()">전시회 입장하기</button>
+        <button class="btn btn-brass" onclick="enter3D()">🚶 3D로 둘러보기</button>
+        <button class="btn btn-brass" onclick="openSubmitForm()">✏️ 내 작품 전시 신청하기</button>
+        <button class="btn btn-ghost" onclick="openMySubmissions()">내 신청 확인하기</button>
+      </div>
+      <button class="btn btn-ghost" id="visitor-logout-btn" style="font-size:0.78rem; margin-top:10px; display:none;" onclick="visitorLogout()">다른 사람으로 입장하기</button>
+    </div>
+
+    <button class="btn btn-ghost" style="margin-top:14px; font-size:0.82rem;" onclick="openAdminLogin()">관리자 모드</button>
   </div>
 </div>
 
@@ -470,6 +515,33 @@ button{font-family:inherit; cursor:pointer;}
       <button class="btn btn-ghost btn-small" onclick="goEntrance()">처음으로</button>
       <button class="btn btn-brass btn-small" onclick="exitAdmin()">관람 모드로</button>
     </div>
+  </div>
+
+  <div class="admin-section">
+    <h2>👥 관람객 로그인 명단</h2>
+    <p style="font-size:0.85rem; color:var(--ink-soft); margin-top:-6px;">관람객은 이름 + PIN 번호(4자리)로 로그인해요. 닉네임은 선생님이 정하지 않고, 처음 로그인할 때 학생이 직접 정합니다. 명단이 1개 이상 등록되면 입장 시 로그인이 필요해져요. (명단이 없으면 누구나 그냥 입장 가능) 작품 신청은 본명으로, 댓글은 학생이 정한 닉네임으로 자동 표시돼요.</p>
+
+    <div style="display:grid; gap:8px; grid-template-columns:1fr 0.6fr; margin-top:12px;">
+      <div>
+        <label style="font-size:0.8rem; color:var(--ink-soft); display:block; margin-bottom:4px;">실명(로그인용 이름)</label>
+        <input type="text" id="roster-realname-input" placeholder="예) 김민준" style="width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid rgba(0,0,0,0.15);">
+      </div>
+      <div>
+        <label style="font-size:0.8rem; color:var(--ink-soft); display:block; margin-bottom:4px;">PIN(4자리)</label>
+        <input type="text" id="roster-pin-input" placeholder="1234" maxlength="4" inputmode="numeric" pattern="[0-9]*" style="width:100%; padding:10px 12px; border-radius:8px; border:1.5px solid rgba(0,0,0,0.15);">
+      </div>
+    </div>
+    <button class="btn btn-primary btn-small" style="margin-top:10px;" onclick="addRosterEntry()">한 명 추가</button>
+
+    <details style="margin-top:14px;">
+      <summary style="cursor:pointer; font-size:0.85rem; color:var(--ink-soft);">여러 명 한 번에 추가하기(붙여넣기)</summary>
+      <p style="font-size:0.78rem; color:var(--ink-soft); margin:8px 0 6px;">한 줄에 "실명,PIN" 형식으로 적어주세요. 예) 김민준,1234</p>
+      <textarea id="roster-bulk-input" placeholder="김민준,1234
+이서연,5678" style="width:100%; min-height:90px; padding:10px 12px; border-radius:8px; border:1.5px solid rgba(0,0,0,0.15); font-family:inherit;"></textarea>
+      <button class="btn btn-brass btn-small" style="margin-top:8px;" onclick="addRosterBulk()">일괄 추가</button>
+    </details>
+
+    <div id="roster-list" style="margin-top:14px;"></div>
   </div>
 
   <div class="admin-section">
@@ -680,6 +752,10 @@ let cachedGalleryTheme = null;   // 지금 적용된 3D 전시장 테마 id (nul
 let cachedGalleryLayout = null;  // 지금 적용된 전시장 구조 id (null이면 기본 "corridor")
 let cachedGalleryFloors = 1;     // 지금 적용된 층수 (1 또는 2)
 let cachedGalleryGrid = null;    // 관리자가 직접 칠한 벽 격자: {cols, rows, cells:"0101..."}
+let cachedRoster = {};           // { id: {realName, nickname} } - 관람객 로그인용 실명-닉네임 명단
+let currentVisitorNickname = null; // 지금 로그인한 사람의 닉네임 (댓글용, 브라우저에 저장하지 않음 - 공용 기기 고려)
+let currentVisitorRealName = null; // 지금 로그인한 사람의 실명 (작품 신청용)
+let currentVisitorRosterId = null; // 지금 로그인한 사람의 명단(roster) id - 닉네임/PIN 변경 시 사용
 
 function initFirebase(){
   const filled = firebaseConfig.databaseURL && !firebaseConfig.databaseURL.includes("여기에-");
@@ -770,6 +846,47 @@ function attachListeners(){
     cachedGalleryGrid = snap.val() || null;
     refreshCurrentScreen();
   });
+
+  db.ref("roster").on("value", snap=>{
+    cachedRoster = snap.val() || {};
+    refreshCurrentScreen();
+    renderEntranceLoginGate();
+  });
+}
+
+function getRosterArray(){
+  return Object.keys(cachedRoster).map(id=> Object.assign({id}, cachedRoster[id]));
+}
+function findRealNameByNickname(nickname){
+  const target = (nickname || "").trim().toLowerCase();
+  if(!target) return null;
+  const found = getRosterArray().find(r=> (r.nickname||"").trim().toLowerCase() === target);
+  return found ? found.realName : null;
+}
+function findNicknameByRealName(realName){
+  const target = (realName || "").trim().toLowerCase();
+  if(!target) return null;
+  const found = getRosterArray().find(r=> (r.realName||"").trim().toLowerCase() === target);
+  return found ? found.nickname : null;
+}
+// 이름 + PIN이 명단과 일치하는 항목을 찾음 (로그인 인증용)
+function findRosterEntryByNameAndPin(name, pin){
+  const targetName = (name || "").trim().toLowerCase();
+  const targetPin = (pin || "").trim();
+  if(!targetName || !targetPin) return null;
+  return getRosterArray().find(r=>
+    (r.realName||"").trim().toLowerCase() === targetName && (r.pin||"") === targetPin
+  ) || null;
+}
+// 관리자 화면에서 댓글 작성자(닉네임) 옆에 실명을 함께 보여줄 때 사용
+function realNameTag(nickname){
+  const real = findRealNameByNickname(nickname);
+  return real ? ` <span style="color:var(--ink-soft); font-weight:400;">(실명: ${escapeHtml(real)})</span>` : "";
+}
+// 관리자 화면에서 신청자(본명) 옆에 닉네임을 함께 보여줄 때 사용
+function nicknameTag(realName){
+  const nick = findNicknameByRealName(realName);
+  return nick ? ` <span style="color:var(--ink-soft); font-weight:400;">(닉네임: ${escapeHtml(nick)})</span>` : "";
 }
 
 function getArtworksArray(){
@@ -803,6 +920,7 @@ function refreshCurrentScreen(){
     renderLayoutGrid();
     renderFloorGrid();
     renderGridEditor();
+    renderRosterList();
   }
   if(!document.getElementById("screen-3d").classList.contains("hidden") && threeRenderer){
     try{ buildGalleryScene(); }catch(err){ console.error("3D 전시관 갱신 오류:", err); }
@@ -839,6 +957,17 @@ function saveMySubmissionIds(arr){
 function generateId(){
   return "art_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2,7);
 }
+
+// 닉네임에 쓰면 안 되는 표현 목록 (초등학생 사용 환경을 고려한 기본적인 필터링)
+const NICKNAME_BANNED_WORDS = [
+  "시발","씨발","씨팔","시팔","개새끼","개새기","병신","븅신","좃","조까",
+  "지랄","꺼져","죽어","뒤져","미친놈","미친년","찐따","느금","ㅅㅂ","ㅂㅅ","ㅈㄹ"
+];
+function containsBannedWord(text){
+  const normalized = (text || "").toLowerCase().replace(/\s/g, "");
+  return NICKNAME_BANNED_WORDS.some(w => normalized.includes(w.toLowerCase()));
+}
+
 function escapeHtml(str){
   const div = document.createElement("div");
   div.textContent = str == null ? "" : str;
@@ -907,10 +1036,203 @@ function enterGallery(){
 }
 function goEntrance(){
   show("screen-entrance");
+  renderEntranceLoginGate();
 }
 function exitAdmin(){
   show("screen-gallery");
   renderGallery();
+}
+
+/* ---------------------------------------------------------
+   관람객 로그인 (이름 + PIN, 명단이 있을 때만 필요)
+   - 공용 기기(태블릿/전자칠판)에서 여러 학생이 번갈아 쓰는 걸 고려해서
+     브라우저에 로그인 정보를 저장하지 않고, 화면을 새로 열 때마다 다시 입력하게 합니다.
+   - 닉네임은 관리자가 정하지 않고, 학생이 처음 로그인할 때 직접 정합니다.
+   --------------------------------------------------------- */
+function renderEntranceLoginGate(){
+  const gateBox = document.getElementById("visitor-login-gate");
+  const setupBox = document.getElementById("visitor-nickname-setup");
+  const actionsBox = document.getElementById("entrance-actions-box");
+  if(!gateBox || !setupBox || !actionsBox) return;
+
+  const rosterExists = getRosterArray().length > 0;
+
+  if(!rosterExists){
+    // 아직 명단이 없으면 로그인 없이 바로 입장 가능 (관리자가 명단 준비 전에도 테스트 가능)
+    gateBox.classList.add("hidden");
+    setupBox.classList.add("hidden");
+    actionsBox.classList.remove("hidden");
+    document.getElementById("visitor-name-badge").textContent = "";
+    document.getElementById("visitor-profile-actions").innerHTML = "";
+    document.getElementById("visitor-logout-btn").style.display = "none";
+    return;
+  }
+
+  if(!currentVisitorRealName){
+    // 아직 로그인 안 함
+    gateBox.classList.remove("hidden");
+    setupBox.classList.add("hidden");
+    actionsBox.classList.add("hidden");
+  }else if(!currentVisitorNickname){
+    // 로그인은 했지만 닉네임을 아직 안 정함
+    gateBox.classList.add("hidden");
+    setupBox.classList.remove("hidden");
+    actionsBox.classList.add("hidden");
+  }else{
+    // 로그인 + 닉네임 설정 모두 완료
+    gateBox.classList.add("hidden");
+    setupBox.classList.add("hidden");
+    actionsBox.classList.remove("hidden");
+    document.getElementById("visitor-name-badge").textContent =
+      "👤 " + currentVisitorRealName + "님으로 입장 중 (닉네임: " + currentVisitorNickname + ")";
+    document.getElementById("visitor-profile-actions").innerHTML =
+      '<button class="btn btn-ghost btn-small" onclick="toggleNicknameEdit()">✏️ 닉네임 바꾸기</button>' +
+      '<button class="btn btn-ghost btn-small" onclick="togglePinEdit()">🔒 PIN 바꾸기</button>';
+    document.getElementById("visitor-logout-btn").style.display = "inline-block";
+  }
+}
+
+function visitorLogin(){
+  const nameInput = document.getElementById("visitor-name-input");
+  const pinInput = document.getElementById("visitor-pin-input");
+  const name = nameInput.value.trim();
+  const pin = pinInput.value.trim();
+  const errorBox = document.getElementById("visitor-login-error");
+
+  if(!name || !pin){
+    errorBox.textContent = "이름과 PIN 번호를 모두 입력해주세요.";
+    return;
+  }
+  const matched = findRosterEntryByNameAndPin(name, pin);
+  if(!matched){
+    errorBox.textContent = "이름 또는 PIN 번호가 맞지 않아요. 선생님께 확인해주세요.";
+    pinInput.value = "";
+    return;
+  }
+  currentVisitorRealName = matched.realName;
+  currentVisitorNickname = matched.nickname || null;
+  currentVisitorRosterId = matched.id;
+  errorBox.textContent = "";
+  nameInput.value = "";
+  pinInput.value = "";
+  renderEntranceLoginGate();
+  if(currentVisitorNickname){
+    showToast(matched.realName + "님, 환영합니다! 🎉");
+  }
+}
+
+function visitorLogout(){
+  currentVisitorRealName = null;
+  currentVisitorNickname = null;
+  currentVisitorRosterId = null;
+  document.getElementById("nickname-edit-box").classList.add("hidden");
+  document.getElementById("pin-edit-box").classList.add("hidden");
+  renderEntranceLoginGate();
+}
+
+// 닉네임 변경 이력에 새 기록을 추가해서 돌려줌 (관리자가 나중에 확인 가능)
+function appendNicknameHistory(rosterId, nickname){
+  const entry = cachedRoster[rosterId] || {};
+  const history = Array.isArray(entry.nicknameHistory) ? entry.nicknameHistory.slice() : [];
+  history.push({ nickname, time: Date.now() });
+  return history;
+}
+
+// 처음 로그인할 때 닉네임을 직접 정해서 저장
+function submitInitialNickname(){
+  if(!requireDb()) return;
+  const input = document.getElementById("visitor-nickname-setup-input");
+  const nickname = input.value.trim();
+  const errorBox = document.getElementById("visitor-nickname-setup-error");
+  if(!nickname){
+    errorBox.textContent = "닉네임을 입력해주세요.";
+    return;
+  }
+  if(containsBannedWord(nickname)){
+    errorBox.textContent = "사용할 수 없는 표현이 포함되어 있어요. 다른 닉네임을 정해주세요.";
+    return;
+  }
+  const taken = getRosterArray().some(r=> r.id !== currentVisitorRosterId && (r.nickname||"").trim().toLowerCase() === nickname.toLowerCase());
+  if(taken){
+    errorBox.textContent = "이미 사용 중인 닉네임이에요. 다른 닉네임을 정해주세요.";
+    return;
+  }
+  const nicknameHistory = appendNicknameHistory(currentVisitorRosterId, nickname);
+  db.ref("roster/" + currentVisitorRosterId).update({ nickname, nicknameHistory })
+    .then(()=>{
+      currentVisitorNickname = nickname;
+      errorBox.textContent = "";
+      input.value = "";
+      renderEntranceLoginGate();
+      showToast(nickname + " 닉네임으로 정했어요! 🎉");
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 저장 중 오류가 발생했어요."); });
+}
+
+// 닉네임 변경 (로그인 후 언제든)
+function toggleNicknameEdit(){
+  document.getElementById("nickname-edit-box").classList.toggle("hidden");
+  document.getElementById("pin-edit-box").classList.add("hidden");
+}
+function saveNicknameEdit(){
+  if(!requireDb()) return;
+  const input = document.getElementById("nickname-edit-input");
+  const nickname = input.value.trim();
+  const errorBox = document.getElementById("nickname-edit-error");
+  if(!nickname){
+    errorBox.textContent = "새 닉네임을 입력해주세요.";
+    return;
+  }
+  if(containsBannedWord(nickname)){
+    errorBox.textContent = "사용할 수 없는 표현이 포함되어 있어요. 다른 닉네임을 정해주세요.";
+    return;
+  }
+  const taken = getRosterArray().some(r=> r.id !== currentVisitorRosterId && (r.nickname||"").trim().toLowerCase() === nickname.toLowerCase());
+  if(taken){
+    errorBox.textContent = "이미 사용 중인 닉네임이에요.";
+    return;
+  }
+  const nicknameHistory = appendNicknameHistory(currentVisitorRosterId, nickname);
+  db.ref("roster/" + currentVisitorRosterId).update({ nickname, nicknameHistory })
+    .then(()=>{
+      currentVisitorNickname = nickname;
+      errorBox.textContent = "";
+      input.value = "";
+      document.getElementById("nickname-edit-box").classList.add("hidden");
+      renderEntranceLoginGate();
+      showToast("닉네임이 바뀌었습니다 ✏️");
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 변경 중 오류가 발생했어요."); });
+}
+
+// PIN 번호 변경 (로그인 후 언제든, 학생이 직접)
+function togglePinEdit(){
+  document.getElementById("pin-edit-box").classList.toggle("hidden");
+  document.getElementById("nickname-edit-box").classList.add("hidden");
+}
+function savePinEdit(){
+  if(!requireDb()) return;
+  const p1 = document.getElementById("pin-edit-input1").value.trim();
+  const p2 = document.getElementById("pin-edit-input2").value.trim();
+  const errorBox = document.getElementById("pin-edit-error");
+  if(!/^\d{4}$/.test(p1)){
+    errorBox.textContent = "PIN 번호는 숫자 4자리로 입력해주세요.";
+    return;
+  }
+  if(p1 !== p2){
+    errorBox.textContent = "두 PIN 번호가 서로 달라요. 다시 확인해주세요.";
+    document.getElementById("pin-edit-input2").value = "";
+    return;
+  }
+  db.ref("roster/" + currentVisitorRosterId).update({ pin: p1 })
+    .then(()=>{
+      errorBox.textContent = "";
+      document.getElementById("pin-edit-input1").value = "";
+      document.getElementById("pin-edit-input2").value = "";
+      document.getElementById("pin-edit-box").classList.add("hidden");
+      showToast("PIN 번호가 바뀌었습니다 🔒");
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 변경 중 오류가 발생했어요."); });
 }
 
 /* ---------------------------------------------------------
@@ -1019,7 +1341,14 @@ function openDetail(id){
   document.getElementById("appreciate-btn").style.opacity = viewedIds.includes(id) ? "0.55" : "1";
 
   renderComments(id);
-  document.getElementById("comment-name").value = "";
+  const nameInput = document.getElementById("comment-name");
+  if(currentVisitorNickname){
+    nameInput.value = currentVisitorNickname;
+    nameInput.readOnly = true;
+  }else{
+    nameInput.value = "";
+    nameInput.readOnly = false;
+  }
   document.getElementById("comment-content").value = "";
   document.getElementById("modal-detail").classList.remove("hidden");
 }
@@ -1123,6 +1452,7 @@ function checkAdminPassword(){
     renderLayoutGrid();
     renderFloorGrid();
     renderGridEditor();
+    renderRosterList();
   }else{
     document.getElementById("admin-login-error").textContent = "비밀번호가 올바르지 않습니다.";
   }
@@ -1296,7 +1626,7 @@ function renderAdminList(){
       ? '<div class="no-comments" style="margin-top:8px;">댓글 없음</div>'
       : cList.map(c=>`
           <div class="admin-comment-row">
-            <span><b>${escapeHtml(c.name)}</b>: ${escapeHtml(c.content)}</span>
+            <span><b>${escapeHtml(c.name)}</b>${realNameTag(c.name)}: ${escapeHtml(c.content)}</span>
             <button class="btn btn-danger btn-small" onclick="deleteComment('${a.id}','${c.id}')">삭제</button>
           </div>
         `).join("");
@@ -1681,7 +2011,14 @@ function clearGridLayoutDraft(){
    학생용: 작품 전시 신청
    --------------------------------------------------------- */
 function openSubmitForm(){
-  document.getElementById("submit-artist").value = "";
+  const artistInput = document.getElementById("submit-artist");
+  if(currentVisitorRealName){
+    artistInput.value = currentVisitorRealName;
+    artistInput.readOnly = true;
+  }else{
+    artistInput.value = "";
+    artistInput.readOnly = false;
+  }
   document.getElementById("submit-title").value = "";
   document.getElementById("submit-type").value = "photo";
   document.getElementById("submit-desc").value = "";
@@ -1801,6 +2138,124 @@ function renderMySubmissions(){
 }
 
 /* ---------------------------------------------------------
+   관리자: 관람객 로그인 명단(실명-닉네임) 관리
+   --------------------------------------------------------- */
+function renderRosterList(){
+  const box = document.getElementById("roster-list");
+  if(!box) return;
+  const list = getRosterArray().sort((a,b)=> (a.realName||"").localeCompare(b.realName||"", "ko"));
+
+  if(list.length === 0){
+    box.innerHTML = '<div class="no-comments">아직 등록된 명단이 없어요. 명단이 없으면 누구나 로그인 없이 입장할 수 있어요.</div>';
+    return;
+  }
+  box.innerHTML = list.map(r=>{
+    const history = Array.isArray(r.nicknameHistory) ? r.nicknameHistory : [];
+    const historyHtml = history.length > 0
+      ? `<details style="margin-top:6px;">
+           <summary style="cursor:pointer; font-size:0.76rem; color:var(--ink-soft);">닉네임 변경 이력 (${history.length}회)</summary>
+           <div style="font-size:0.74rem; color:var(--ink-soft); margin-top:4px; line-height:1.6;">
+             ${history.map(h=> escapeHtml(h.nickname) + ' <span style="opacity:0.7;">(' + formatTime(h.time) + ')</span>').join('<br>')}
+           </div>
+         </details>`
+      : "";
+
+    return `
+      <div class="admin-list-item" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">
+          <div class="admin-list-info">
+            <b>${escapeHtml(r.realName)}</b>
+            <span>PIN: ${escapeHtml(r.pin || "-")} · 닉네임: ${r.nickname ? escapeHtml(r.nickname) : "(아직 안 정함)"}</span>
+          </div>
+          <div class="admin-list-actions">
+            <button class="btn btn-brass btn-small" onclick="resetRosterPin('${r.id}')">PIN 초기화</button>
+            <button class="btn btn-danger btn-small" onclick="deleteRosterEntry('${r.id}')">삭제</button>
+          </div>
+        </div>
+        ${historyHtml}
+      </div>
+    `;
+  }).join("");
+}
+
+// 학생이 PIN을 잊어버렸을 때, 관리자가 새 PIN으로 바로 바꿔줄 수 있는 기능
+function resetRosterPin(id){
+  if(!requireDb()) return;
+  const newPin = prompt("이 학생의 새 PIN 번호를 입력해주세요 (숫자 4자리)");
+  if(newPin === null) return; // 취소
+  const trimmed = newPin.trim();
+  if(!/^\d{4}$/.test(trimmed)){
+    showToast("PIN 번호는 숫자 4자리로 입력해주세요.");
+    return;
+  }
+  db.ref("roster/" + id).update({ pin: trimmed })
+    .then(()=> showToast("PIN 번호가 초기화되었습니다 🔒"))
+    .catch(err=>{ console.error(err); showToast("⚠️ 변경 중 오류가 발생했어요."); });
+}
+
+function addRosterEntry(){
+  if(!requireDb()) return;
+  const realName = document.getElementById("roster-realname-input").value.trim();
+  const pin = document.getElementById("roster-pin-input").value.trim();
+  if(!realName || !pin){
+    showToast("실명과 PIN 번호를 모두 입력해주세요.");
+    return;
+  }
+  if(!/^\d{4}$/.test(pin)){
+    showToast("PIN 번호는 숫자 4자리로 입력해주세요.");
+    return;
+  }
+  const id = generateId();
+  db.ref("roster/" + id).set({ realName, pin, nickname: null })
+    .then(()=>{
+      showToast("명단에 추가되었습니다 👥 (닉네임은 학생이 처음 로그인할 때 직접 정해요)");
+      document.getElementById("roster-realname-input").value = "";
+      document.getElementById("roster-pin-input").value = "";
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 추가 중 오류가 발생했어요."); });
+}
+
+function addRosterBulk(){
+  if(!requireDb()) return;
+  const raw = document.getElementById("roster-bulk-input").value;
+  const lines = raw.split("\n").map(l=>l.trim()).filter(Boolean);
+  if(lines.length === 0){
+    showToast("붙여넣을 명단을 입력해주세요.");
+    return;
+  }
+  const updates = {};
+  let count = 0;
+  let skipped = 0;
+  lines.forEach(line=>{
+    const parts = line.split(",");
+    if(parts.length < 2){ skipped++; return; }
+    const realName = parts[0].trim();
+    const pin = parts[1].trim();
+    if(!realName || !/^\d{4}$/.test(pin)){ skipped++; return; }
+    updates["roster/" + generateId()] = { realName, pin, nickname: null };
+    count++;
+  });
+  if(count === 0){
+    showToast('⚠️ 형식을 확인해주세요. 예) 김민준,1234 (PIN은 숫자 4자리)');
+    return;
+  }
+  db.ref().update(updates)
+    .then(()=>{
+      showToast(count + "명이 추가되었습니다 👥" + (skipped > 0 ? ` (형식이 안 맞는 ${skipped}줄은 건너뜀)` : ""));
+      document.getElementById("roster-bulk-input").value = "";
+    })
+    .catch(err=>{ console.error(err); showToast("⚠️ 추가 중 오류가 발생했어요."); });
+}
+
+function deleteRosterEntry(id){
+  if(!requireDb()) return;
+  if(!confirm("이 명단을 삭제하시겠습니까?")) return;
+  db.ref("roster/" + id).remove()
+    .then(()=> showToast("삭제되었습니다."))
+    .catch(err=>{ console.error(err); showToast("⚠️ 삭제 중 오류가 발생했어요."); });
+}
+
+/* ---------------------------------------------------------
    관리자: 전시 신청 승인/거절
    --------------------------------------------------------- */
 function renderSubmissionLists(){
@@ -1840,7 +2295,7 @@ function renderSubmissionRow(s, isPending){
       <div class="admin-thumb">${thumb}</div>
       <div class="admin-list-info">
         <b>${escapeHtml(s.title)}</b>
-        <span>${escapeHtml(s.artist)} · ${typeLabel(s.type)}</span>
+        <span>${escapeHtml(s.artist)}${nicknameTag(s.artist)} · ${typeLabel(s.type)}</span>
         <span style="display:block; margin-top:4px; color:var(--ink); font-size:0.82rem;">${escapeHtml(s.desc || "")}</span>
         ${s.status === "rejected" && s.rejectReason ? `<span style="color:var(--brick-dark);">의견: ${escapeHtml(s.rejectReason)}</span>` : ""}
       </div>
@@ -1911,6 +2366,7 @@ function exportData(){
     galleryLayout: cachedGalleryLayout,
     galleryFloors: cachedGalleryFloors,
     galleryGrid: cachedGalleryGrid,
+    roster: cachedRoster,
     exportedAt: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
@@ -1976,7 +2432,8 @@ function importData(e){
         db.ref("galleryTheme").set(data.galleryTheme || null),
         db.ref("galleryLayout").set(data.galleryLayout || null),
         db.ref("galleryFloors").set(data.galleryFloors || null),
-        db.ref("galleryGrid").set(data.galleryGrid || null)
+        db.ref("galleryGrid").set(data.galleryGrid || null),
+        db.ref("roster").set(data.roster && Object.keys(data.roster).length ? data.roster : null)
       ]).then(()=>{
         showToast("데이터를 가져왔습니다 ✅");
       }).catch(err=>{
