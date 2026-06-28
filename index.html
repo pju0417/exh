@@ -606,6 +606,7 @@ button{font-family:inherit; cursor:pointer;}
   </div>
 
   <button class="btn btn-ghost btn-small" id="three-exit-btn" onclick="exit3D()">✕ 나가기</button>
+  <button class="btn btn-brass btn-small hidden" id="floor-switch-btn" onclick="toggleFloor()" style="position:absolute; top:62px; right:14px; z-index:6;">🔼 2층으로 올라가기</button>
 
   <div id="three-move-pad">
     <button class="three-move-btn" id="btn-forward" style="grid-area:up;">▲</button>
@@ -805,6 +806,7 @@ function refreshCurrentScreen(){
   }
   if(!document.getElementById("screen-3d").classList.contains("hidden") && threeRenderer){
     try{ buildGalleryScene(); }catch(err){ console.error("3D 전시관 갱신 오류:", err); }
+    updateFloorSwitchButton();
   }
   if(!document.getElementById("modal-detail").classList.contains("hidden") && currentDetailId){
     refreshDetailModal();
@@ -2127,6 +2129,8 @@ function enter3D(){
     playerYaw = 0;
   }
   playerPitch = 0;
+  currentFloorIndex = 0;
+  updateFloorSwitchButton();
   requestAnimationFrame(resizeThree);
   startRenderLoop();
 }
@@ -2134,6 +2138,30 @@ function exit3D(){
   stopRenderLoop();
   show("screen-gallery");
   renderGallery();
+}
+
+/* ---------------------------------------------------------
+   층 이동: 계단 대신 버튼으로 1층↔2층을 바로 이동
+   --------------------------------------------------------- */
+let currentFloorIndex = 0; // 0=1층, 1=2층
+
+function updateFloorSwitchButton(){
+  const btn = document.getElementById("floor-switch-btn");
+  if(!btn) return;
+  if(getActiveFloorCount() !== 2){
+    btn.classList.add("hidden");
+    return;
+  }
+  btn.classList.remove("hidden");
+  btn.textContent = currentFloorIndex === 0 ? "🔼 2층으로 올라가기" : "🔽 1층으로 내려가기";
+}
+
+function toggleFloor(){
+  if(getActiveFloorCount() !== 2) return;
+  currentFloorIndex = currentFloorIndex === 0 ? 1 : 0;
+  playerPos.y = currentFloorIndex === 0 ? 1.6 : (FLOOR_GAP + 1.6);
+  updateFloorSwitchButton();
+  showToast(currentFloorIndex === 0 ? "1층으로 이동했어요" : "2층으로 이동했어요 🔼");
 }
 
 /* ---------------------------------------------------------
@@ -2267,11 +2295,6 @@ function buildGalleryScene(){
     });
   }
 
-  // 2층일 때만 계단(경사로) 추가
-  if(floorCount === 2 && activeStairZone){
-    buildStaircase(threeGalleryGroup, theme, activeStairZone);
-  }
-
   threeScene.add(threeGalleryGroup);
 }
 
@@ -2337,14 +2360,17 @@ function assignArtworksToSlots(artworks, slotCount){
 // placeFramesGrid(3D 배치)와 관리자 편집기(자리 개수 안내)가 함께 사용합니다.
 function collectGridFaces(grid){
   const faces = [];
+  // 벽은 한 칸이 통째로 두꺼운 블록(3m)이라, 벽 "표면보다 바깥쪽"(열린 칸 방향)으로
+  // 살짝 튀어나오게 배치해야 작품이 가려지지 않습니다.
+  const offset = CELL_SIZE/2 + 0.1;
   for(let r=0; r<GRID_ROWS; r++){
     for(let c=0; c<GRID_COLS; c++){
       if(grid[r][c] !== 1) continue;
       const candidates = [
-        {nr:r-1, nc:c,   rotY:Math.PI,    dx:0, dz:-(CELL_SIZE/2-0.12)},
-        {nr:r+1, nc:c,   rotY:0,          dx:0, dz: (CELL_SIZE/2-0.12)},
-        {nr:r,   nc:c-1, rotY:-Math.PI/2, dx:-(CELL_SIZE/2-0.12), dz:0},
-        {nr:r,   nc:c+1, rotY: Math.PI/2, dx: (CELL_SIZE/2-0.12), dz:0}
+        {nr:r-1, nc:c,   rotY:Math.PI,    dx:0, dz:-offset},
+        {nr:r+1, nc:c,   rotY:0,          dx:0, dz: offset},
+        {nr:r,   nc:c-1, rotY:-Math.PI/2, dx:-offset, dz:0},
+        {nr:r,   nc:c+1, rotY: Math.PI/2, dx: offset, dz:0}
       ];
       candidates.forEach(cand=>{
         if(cand.nr<0 || cand.nr>=GRID_ROWS || cand.nc<0 || cand.nc>=GRID_COLS) return;
@@ -2772,14 +2798,7 @@ function updateMovement(delta){
     }
   }
 
-  // 계단(경사로) 구간 안에 있으면 z 위치에 따라 눈높이를 부드럽게 바꿔줌 (2층일 때만 의미 있음)
-  if(getActiveFloorCount() === 2 && activeStairZone &&
-     playerPos.x >= activeStairZone.xMin && playerPos.x <= activeStairZone.xMax &&
-     playerPos.z >= activeStairZone.zMin && playerPos.z <= activeStairZone.zMax){
-    const t = (playerPos.z - activeStairZone.zMin) / (activeStairZone.zMax - activeStairZone.zMin);
-    playerPos.y = 1.6 + t * FLOOR_GAP;
-  }
-  // 계단 구간 밖에서는 마지막 높이를 그대로 유지 (1층 또는 2층 바닥에 서 있는 상태)
+  // 층 높이는 이제 "층 이동" 버튼으로만 바뀝니다 (계단 구간 자동 보정 없음)
 
   threeCamera.position.set(playerPos.x, playerPos.y, playerPos.z);
 }
