@@ -291,6 +291,16 @@ button{font-family:inherit; cursor:pointer;}
 }
 .three-move-btn:active{background:var(--brass); color:#fff;}
 
+.grid-editor-wrap{
+  display:inline-grid; gap:2px; background:#ccc; padding:6px; border-radius:8px;
+  touch-action:none; user-select:none;
+}
+.grid-cell{ width:22px; height:22px; border-radius:3px; }
+.grid-cell.floor{ background:#fff; border:1px solid rgba(0,0,0,0.12); cursor:pointer; }
+.grid-cell.wall{ background:var(--brass); cursor:pointer; }
+.grid-cell.border{ background:var(--ink); cursor:not-allowed; }
+.grid-cell.entry{ background:var(--moss); cursor:not-allowed; }
+
 @media (max-width:640px){
   .gallery-grid{grid-template-columns:1fr; gap:28px;}
   .entrance-card{padding:40px 24px;}
@@ -536,6 +546,38 @@ button{font-family:inherit; cursor:pointer;}
   </div>
 
   <div class="admin-section">
+    <h2>🎨 3D 전시장 테마</h2>
+    <p style="font-size:0.85rem; color:var(--ink-soft); margin-top:-6px;">3D로 둘러보기 화면의 벽·바닥·조명 분위기를 미리 만들어둔 테마 중에서 골라 적용할 수 있어요.</p>
+    <div id="theme-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-top:12px;"></div>
+  </div>
+
+  <div class="admin-section">
+    <h2>🏛 3D 전시장 구조</h2>
+    <p style="font-size:0.85rem; color:var(--ink-soft); margin-top:-6px;">전시장의 모양과 층수를 정해진 틀 안에서 골라 적용할 수 있어요.</p>
+
+    <div style="margin-top:14px;">
+      <label style="font-size:0.85rem; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:8px;">전시장 구조</label>
+      <div id="layout-grid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px;"></div>
+    </div>
+
+    <div style="margin-top:18px;">
+      <label style="font-size:0.85rem; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:8px;">층수</label>
+      <div id="floor-grid" style="display:flex; gap:10px;"></div>
+      <p style="font-size:0.78rem; color:var(--ink-soft); margin-top:8px;">2층을 고르면 입구 중앙에 경사로가 생겨요. 작품은 절반씩 1층/2층에 나눠서 배치됩니다.</p>
+    </div>
+
+    <div style="margin-top:20px; border-top:2px dashed rgba(156,122,63,0.35); padding-top:16px;">
+      <label style="font-size:0.85rem; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:6px;">🧱 직접 설계: 벽 칠하기</label>
+      <p style="font-size:0.78rem; color:var(--ink-soft); margin:0 0 10px;">칸을 누르거나 마우스/손가락으로 쓸어가며 벽으로 칠할 수 있어요. 어두운 칸은 항상 외벽, 초록 칸은 입구라서 칠할 수 없어요. "저장하고 적용하기"를 누르면 "직접 설계" 구조로 바로 바뀌어요.</p>
+      <div id="grid-editor-wrap" class="grid-editor-wrap"></div>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-small" onclick="saveGridLayout()">저장하고 적용하기</button>
+        <button class="btn btn-ghost btn-small" onclick="clearGridLayoutDraft()">벽 모두 지우기(초안)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-section">
     <h2>📦 데이터 관리</h2>
     <div class="data-tools">
       <button class="btn btn-brass" onclick="exportData()">전체 데이터 내보내기</button>
@@ -626,6 +668,10 @@ let cachedViews = {};     // { artworkId: number }
 let cachedCollections = {};      // { collectionId: {name, artworkIds:{id:true,...}, createdAt} }
 let cachedActiveCollectionId = null; // 지금 관람객에게 보이는 묶음 id (null이면 전체 작품)
 let cachedSubmissions = {};      // { submissionId: {title, artist, type, desc, fileData, aspectRatio, status, ...} }
+let cachedGalleryTheme = null;   // 지금 적용된 3D 전시장 테마 id (null이면 기본 "classic")
+let cachedGalleryLayout = null;  // 지금 적용된 전시장 구조 id (null이면 기본 "corridor")
+let cachedGalleryFloors = 1;     // 지금 적용된 층수 (1 또는 2)
+let cachedGalleryGrid = null;    // 관리자가 직접 칠한 벽 격자: {cols, rows, cells:"0101..."}
 
 function initFirebase(){
   const filled = firebaseConfig.databaseURL && !firebaseConfig.databaseURL.includes("여기에-");
@@ -696,6 +742,26 @@ function attachListeners(){
     cachedSubmissions = snap.val() || {};
     refreshCurrentScreen();
   });
+
+  db.ref("galleryTheme").on("value", snap=>{
+    cachedGalleryTheme = snap.val() || null;
+    refreshCurrentScreen();
+  });
+
+  db.ref("galleryLayout").on("value", snap=>{
+    cachedGalleryLayout = snap.val() || null;
+    refreshCurrentScreen();
+  });
+
+  db.ref("galleryFloors").on("value", snap=>{
+    cachedGalleryFloors = snap.val() || 1;
+    refreshCurrentScreen();
+  });
+
+  db.ref("galleryGrid").on("value", snap=>{
+    cachedGalleryGrid = snap.val() || null;
+    refreshCurrentScreen();
+  });
 }
 
 function getArtworksArray(){
@@ -725,6 +791,10 @@ function refreshCurrentScreen(){
     renderAdminList();
     renderCollectionList();
     renderSubmissionLists();
+    renderThemeGrid();
+    renderLayoutGrid();
+    renderFloorGrid();
+    renderGridEditor();
   }
   if(!document.getElementById("screen-3d").classList.contains("hidden") && threeRenderer){
     buildGalleryScene();
@@ -1040,6 +1110,10 @@ function checkAdminPassword(){
     renderAdminList();
     renderCollectionList();
     renderSubmissionLists();
+    renderThemeGrid();
+    renderLayoutGrid();
+    renderFloorGrid();
+    renderGridEditor();
   }else{
     document.getElementById("admin-login-error").textContent = "비밀번호가 올바르지 않습니다.";
   }
@@ -1377,6 +1451,199 @@ function deleteCollection(id){
 }
 
 /* ---------------------------------------------------------
+   관리자: 3D 전시장 테마 선택 (정해진 테마 중에서만 고를 수 있음)
+   --------------------------------------------------------- */
+function hexToCss(hexNum){
+  return "#" + hexNum.toString(16).padStart(6, "0");
+}
+
+function renderThemeGrid(){
+  const box = document.getElementById("theme-grid");
+  if(!box) return;
+  const activeId = cachedGalleryTheme || "classic";
+
+  box.innerHTML = Object.keys(THEME_PRESETS).map(id=>{
+    const t = THEME_PRESETS[id];
+    const isActive = activeId === id;
+    return `
+      <button onclick="applyTheme('${id}')" style="text-align:left; border:2px solid ${isActive ? "var(--moss)" : "rgba(0,0,0,0.12)"}; border-radius:12px; padding:10px; background:#fff; cursor:pointer; font-family:inherit;">
+        <div style="height:46px; border-radius:8px; overflow:hidden; display:flex; margin-bottom:8px;">
+          <div style="flex:2; background:${hexToCss(t.wall)};"></div>
+          <div style="flex:1; background:${hexToCss(t.frame)};"></div>
+          <div style="flex:2; background:${hexToCss(t.floor)};"></div>
+        </div>
+        <div style="font-size:0.85rem; font-weight:700; color:var(--ink);">${t.name}${isActive ? " ✅" : ""}</div>
+      </button>
+    `;
+  }).join("");
+}
+
+function applyTheme(id){
+  if(!requireDb()) return;
+  if(!THEME_PRESETS[id]){
+    showToast("⚠️ 알 수 없는 테마예요.");
+    return;
+  }
+  db.ref("galleryTheme").set(id)
+    .then(()=> showToast(THEME_PRESETS[id].name + " 테마가 적용되었습니다 🎨"))
+    .catch(err=>{ console.error(err); showToast("⚠️ 테마 적용 중 오류가 발생했어요."); });
+}
+
+/* ---------------------------------------------------------
+   관리자: 3D 전시장 구조(레이아웃) / 층수 선택 (정해진 틀 안에서만 선택)
+   --------------------------------------------------------- */
+function renderLayoutGrid(){
+  const box = document.getElementById("layout-grid");
+  if(!box) return;
+  const activeId = cachedGalleryLayout || "corridor";
+  box.innerHTML = Object.keys(LAYOUT_PRESETS).map(id=>{
+    const l = LAYOUT_PRESETS[id];
+    const isActive = activeId === id;
+    return `
+      <button onclick="applyLayout('${id}')" style="text-align:left; border:2px solid ${isActive ? "var(--moss)" : "rgba(0,0,0,0.12)"}; border-radius:12px; padding:12px; background:#fff; cursor:pointer; font-family:inherit;">
+        <div style="font-size:0.85rem; font-weight:700; color:var(--ink);">${l.name}${isActive ? " ✅" : ""}</div>
+      </button>
+    `;
+  }).join("");
+}
+
+function applyLayout(id){
+  if(!requireDb()) return;
+  if(!LAYOUT_PRESETS[id]){
+    showToast("⚠️ 알 수 없는 구조예요.");
+    return;
+  }
+  db.ref("galleryLayout").set(id)
+    .then(()=> showToast(LAYOUT_PRESETS[id].name + " 구조가 적용되었습니다 🏛"))
+    .catch(err=>{ console.error(err); showToast("⚠️ 구조 적용 중 오류가 발생했어요."); });
+}
+
+function renderFloorGrid(){
+  const box = document.getElementById("floor-grid");
+  if(!box) return;
+  const activeFloors = getActiveFloorCount();
+  box.innerHTML = [1, 2].map(n=>{
+    const isActive = activeFloors === n;
+    return `
+      <button onclick="applyFloorCount(${n})" style="flex:1; text-align:center; border:2px solid ${isActive ? "var(--moss)" : "rgba(0,0,0,0.12)"}; border-radius:12px; padding:12px; background:#fff; cursor:pointer; font-family:inherit; font-size:0.9rem; font-weight:700; color:var(--ink);">
+        ${n}층${isActive ? " ✅" : ""}
+      </button>
+    `;
+  }).join("");
+}
+
+function applyFloorCount(n){
+  if(!requireDb()) return;
+  db.ref("galleryFloors").set(n)
+    .then(()=> showToast(n + "층 구조가 적용되었습니다 🏛"))
+    .catch(err=>{ console.error(err); showToast("⚠️ 층수 적용 중 오류가 발생했어요."); });
+}
+
+/* ---------------------------------------------------------
+   관리자: "직접 설계" 격자 편집기 (벽 칠하기)
+   - workingGrid: 화면에서 칠하는 중인 임시(아직 저장 안 된) 격자
+   - 저장하기를 눌러야 Firebase에 반영되고, 동시에 구조가 "custom"으로 바뀜
+   --------------------------------------------------------- */
+let workingGrid = null;
+let gridPaintState = { active:false, value:0 };
+let gridEditorBound = false;
+
+function ensureWorkingGrid(){
+  if(!workingGrid) workingGrid = getActiveGridArray();
+}
+
+function gridCellClass(r, c, val){
+  if(isEntryCell(r, c)) return "entry";
+  if(isBorderCell(r, c)) return "border";
+  return val ? "wall" : "floor";
+}
+
+function renderGridEditor(){
+  const box = document.getElementById("grid-editor-wrap");
+  if(!box) return;
+  ensureWorkingGrid();
+  box.style.gridTemplateColumns = `repeat(${GRID_COLS}, 22px)`;
+  box.style.gridTemplateRows = `repeat(${GRID_ROWS}, 22px)`;
+  let html = "";
+  for(let r=0; r<GRID_ROWS; r++){
+    for(let c=0; c<GRID_COLS; c++){
+      html += `<div class="grid-cell ${gridCellClass(r,c,workingGrid[r][c])}" data-row="${r}" data-col="${c}"></div>`;
+    }
+  }
+  box.innerHTML = html;
+  bindGridEditorEvents();
+}
+
+function updateGridCellVisual(r, c){
+  const box = document.getElementById("grid-editor-wrap");
+  if(!box) return;
+  const el = box.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+  if(el) el.className = "grid-cell " + gridCellClass(r, c, workingGrid[r][c]);
+}
+
+function bindGridEditorEvents(){
+  if(gridEditorBound) return;
+  const box = document.getElementById("grid-editor-wrap");
+  if(!box) return;
+  gridEditorBound = true;
+  box.addEventListener("pointerdown", onGridPointerDown);
+  box.addEventListener("pointermove", onGridPointerMove);
+  window.addEventListener("pointerup", onGridPointerUp);
+}
+
+function onGridPointerDown(e){
+  const cell = e.target.closest(".grid-cell");
+  if(!cell) return;
+  const r = +cell.dataset.row, c = +cell.dataset.col;
+  if(isBorderCell(r,c) || isEntryCell(r,c)) return;
+  e.preventDefault();
+  ensureWorkingGrid();
+  const newVal = workingGrid[r][c] ? 0 : 1;
+  gridPaintState = { active:true, value:newVal };
+  workingGrid[r][c] = newVal;
+  updateGridCellVisual(r, c);
+}
+
+function onGridPointerMove(e){
+  if(!gridPaintState.active) return;
+  const el = document.elementFromPoint(e.clientX, e.clientY);
+  const cell = el && el.closest && el.closest(".grid-cell");
+  if(!cell) return;
+  const r = +cell.dataset.row, c = +cell.dataset.col;
+  if(isBorderCell(r,c) || isEntryCell(r,c)) return;
+  if(workingGrid[r][c] !== gridPaintState.value){
+    workingGrid[r][c] = gridPaintState.value;
+    updateGridCellVisual(r, c);
+  }
+}
+
+function onGridPointerUp(){
+  gridPaintState.active = false;
+}
+
+function saveGridLayout(){
+  if(!requireDb()) return;
+  ensureWorkingGrid();
+  const cleaned = sanitizeGridArray(workingGrid.map(row=> row.slice()));
+  const cells = gridArrayToString(cleaned);
+  Promise.all([
+    db.ref("galleryGrid").set({ cols: GRID_COLS, rows: GRID_ROWS, cells }),
+    db.ref("galleryLayout").set("custom")
+  ]).then(()=>{
+    showToast("직접 설계한 전시장이 저장·적용되었습니다 🧱");
+  }).catch(err=>{
+    console.error(err);
+    showToast("⚠️ 저장 중 오류가 발생했어요.");
+  });
+}
+
+function clearGridLayoutDraft(){
+  workingGrid = defaultGridArray();
+  renderGridEditor();
+  showToast("초안을 비웠어요. \"저장하고 적용하기\"를 눌러야 실제로 반영돼요.");
+}
+
+/* ---------------------------------------------------------
    학생용: 작품 전시 신청
    --------------------------------------------------------- */
 function openSubmitForm(){
@@ -1606,6 +1873,10 @@ function exportData(){
     collections: cachedCollections,
     activeCollectionId: cachedActiveCollectionId,
     submissions: cachedSubmissions,
+    galleryTheme: cachedGalleryTheme,
+    galleryLayout: cachedGalleryLayout,
+    galleryFloors: cachedGalleryFloors,
+    galleryGrid: cachedGalleryGrid,
     exportedAt: new Date().toISOString()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
@@ -1667,7 +1938,11 @@ function importData(e){
         db.ref("views").set(data.views && Object.keys(data.views).length ? data.views : null),
         db.ref("collections").set(Object.keys(collectionsObj).length ? collectionsObj : null),
         db.ref("activeCollectionId").set(data.activeCollectionId || null),
-        db.ref("submissions").set(Object.keys(submissionsObj).length ? submissionsObj : null)
+        db.ref("submissions").set(Object.keys(submissionsObj).length ? submissionsObj : null),
+        db.ref("galleryTheme").set(data.galleryTheme || null),
+        db.ref("galleryLayout").set(data.galleryLayout || null),
+        db.ref("galleryFloors").set(data.galleryFloors || null),
+        db.ref("galleryGrid").set(data.galleryGrid || null)
       ]).then(()=>{
         showToast("데이터를 가져왔습니다 ✅");
       }).catch(err=>{
@@ -1705,9 +1980,95 @@ let playerYaw = 0, playerPitch = 0;
 let moveState = {forward:false, back:false, left:false, right:false};
 let dragState = {active:false, moved:false, lastX:0, lastY:0, startX:0, startY:0};
 let interactiveMeshes = [];
-const ROOM_HALF_WIDTH = 5.5;
-let roomLength = 20;
+const ROOM_HALF_WIDTH = 5.5;   // 복도형 전시실의 절반 너비
+const HALL_HALF_WIDTH = 7.5;   // 사각형 홀형 전시실의 절반 너비
+const WALL_HEIGHT = 3.4;
+const FLOOR_GAP = 3.4;         // 1층 천장 ~ 2층 바닥까지의 높이 (2층일 때만 사용)
+let roomLength = 20;            // 전시실 한 층의 길이(작품 수에 따라 자동 계산)
 let lastFrameTime = performance.now();
+
+// 전시장 구조(레이아웃)·층수 프리셋 - 정해진 틀 안에서만 선택 가능
+const LAYOUT_PRESETS = {
+  corridor: { name:"복도형 (좌우 벽)", halfWidth: ROOM_HALF_WIDTH },
+  hall:     { name:"사각형 홀형 (둘레 전체)", halfWidth: HALL_HALF_WIDTH },
+  custom:   { name:"직접 설계 (격자)", halfWidth: null }
+};
+function getActiveLayout(){
+  return LAYOUT_PRESETS[cachedGalleryLayout] || LAYOUT_PRESETS.corridor;
+}
+function getActiveFloorCount(){
+  return cachedGalleryFloors === 2 ? 2 : 1;
+}
+// 계단(경사로) 위치: 기본 구조에서는 입구 쪽 중앙 고정. 이 구간을 지나가면 층 사이 높이가 자동으로 바뀝니다.
+const STAIR_X_MIN = -1.0, STAIR_X_MAX = 1.0;
+const STAIR_Z_MIN = -1.7, STAIR_Z_MAX = -0.3;
+let currentCollisionGrid = null; // "직접 설계" 구조일 때만 사용하는 벽 충돌용 격자
+let activeStairZone = null;      // 지금 씬에서 실제로 쓰이는 계단 구간 (구조에 따라 달라짐)
+
+/* ---------------------------------------------------------
+   "직접 설계(격자)" 구조 - 관리자가 벽 칠한 칸을 그대로 3D 벽으로 만듦
+   - 격자 크기는 고정(정해진 구역): GRID_COLS x GRID_ROWS
+   - 가장 바깥 테두리는 항상 외벽, 입구 칸은 항상 빈 칸으로 고정
+   --------------------------------------------------------- */
+const GRID_COLS = 10;
+const GRID_ROWS = 12;
+const CELL_SIZE = 3;
+const ENTRY_ROW = 1;
+const ENTRY_COL = Math.floor(GRID_COLS/2);
+
+function isBorderCell(r, c){
+  return r === 0 || r === GRID_ROWS-1 || c === 0 || c === GRID_COLS-1;
+}
+function isEntryCell(r, c){
+  return r === ENTRY_ROW && c === ENTRY_COL;
+}
+function defaultGridArray(){
+  const arr = [];
+  for(let r=0; r<GRID_ROWS; r++){
+    const row = [];
+    for(let c=0; c<GRID_COLS; c++) row.push(isBorderCell(r,c) ? 1 : 0);
+    arr.push(row);
+  }
+  return arr;
+}
+function gridArrayToString(arr){
+  return arr.map(row=> row.join("")).join("");
+}
+function stringToGridArray(str){
+  const arr = [];
+  for(let r=0; r<GRID_ROWS; r++){
+    const row = [];
+    for(let c=0; c<GRID_COLS; c++){
+      row.push(str.charAt(r*GRID_COLS+c) === "1" ? 1 : 0);
+    }
+    arr.push(row);
+  }
+  return arr;
+}
+// 테두리/입구 규칙을 항상 강제로 맞춰줌 (저장된 데이터가 옛 형식이거나 깨졌을 때 보정)
+function sanitizeGridArray(arr){
+  for(let r=0; r<GRID_ROWS; r++){
+    for(let c=0; c<GRID_COLS; c++){
+      if(isBorderCell(r,c)) arr[r][c] = 1;
+    }
+  }
+  arr[ENTRY_ROW][ENTRY_COL] = 0;
+  return arr;
+}
+function getActiveGridArray(){
+  if(cachedGalleryGrid && cachedGalleryGrid.cells && cachedGalleryGrid.cells.length === GRID_COLS*GRID_ROWS){
+    return sanitizeGridArray(stringToGridArray(cachedGalleryGrid.cells));
+  }
+  return defaultGridArray();
+}
+function gridCellWorldX(c){ return (c - (GRID_COLS-1)/2) * CELL_SIZE; }
+function gridCellWorldZ(r){ return r * CELL_SIZE; }
+function isWallAtWorld(grid, x, z){
+  const c = Math.round(x / CELL_SIZE + (GRID_COLS-1)/2);
+  const r = Math.round(z / CELL_SIZE);
+  if(r < 0 || r >= GRID_ROWS || c < 0 || c >= GRID_COLS) return true;
+  return grid[r][c] === 1;
+}
 
 function enter3D(){
   if(typeof THREE === "undefined"){
@@ -1719,8 +2080,14 @@ function enter3D(){
   if(!threeRenderer) initThreeRenderer();
   if(!threeControlsReady) setupThreeControls();
   buildGalleryScene();
-  playerPos = {x:0, y:1.6, z:-1};
-  playerYaw = 0; playerPitch = 0;
+  if((cachedGalleryLayout || "corridor") === "custom"){
+    playerPos = {x: gridCellWorldX(ENTRY_COL), y:1.6, z: gridCellWorldZ(ENTRY_ROW)};
+    playerYaw = Math.PI; // 입구에서 전시장 안쪽(격자 row가 커지는 방향)을 보도록
+  }else{
+    playerPos = {x:0, y:1.6, z:-1};
+    playerYaw = 0;
+  }
+  playerPitch = 0;
   requestAnimationFrame(resizeThree);
   startRenderLoop();
 }
@@ -1730,6 +2097,22 @@ function exit3D(){
   renderGallery();
 }
 
+/* ---------------------------------------------------------
+   3D 전시장 테마 프리셋 (관리자가 이 안에서만 골라서 적용)
+   --------------------------------------------------------- */
+const THEME_PRESETS = {
+  classic:      { name:"클래식 갤러리",  bg:0xece6d8, floor:0xD8CBB0, ceiling:0xF3EEE2, wall:0xEDE6D6, frame:0x9C7A3F, ambient:0xffffff, ambientI:0.70, dir:0xffffff, dirI:0.55 },
+  modern_white: { name:"모던 화이트",    bg:0xf5f5f4, floor:0xEDEDEA, ceiling:0xFFFFFF, wall:0xF7F6F3, frame:0x2B2B2B, ambient:0xffffff, ambientI:0.90, dir:0xffffff, dirI:0.50 },
+  dark_mood:    { name:"다크 무드",      bg:0x1B1B1F, floor:0x2A2A2E, ceiling:0x141416, wall:0x232327, frame:0xC9A227, ambient:0xffffff, ambientI:0.32, dir:0xffffff, dirI:0.85 },
+  wood:         { name:"우드 갤러리",    bg:0xE7D8BD, floor:0x8A5A34, ceiling:0xF1E3C8, wall:0xC9A06A, frame:0x5C3A21, ambient:0xFFF1DE, ambientI:0.75, dir:0xFFE7BF, dirI:0.50 },
+  pastel:       { name:"파스텔 키즈",    bg:0xFDF2F8, floor:0xFCE8EF, ceiling:0xFFFFFF, wall:0xFBE7F0, frame:0xE99FB8, ambient:0xffffff, ambientI:0.90, dir:0xffffff, dirI:0.45 }
+};
+function getActiveTheme(){
+  return THEME_PRESETS[cachedGalleryTheme] || THEME_PRESETS.classic;
+}
+
+let threeAmbientLight = null, threeDirLight = null;
+
 function initThreeRenderer(){
   const wrap = document.getElementById("three-canvas-wrap");
   threeRenderer = new THREE.WebGLRenderer({antialias:true});
@@ -1737,18 +2120,32 @@ function initThreeRenderer(){
   wrap.appendChild(threeRenderer.domElement);
 
   threeScene = new THREE.Scene();
-  threeScene.background = new THREE.Color(0xece6d8);
 
   threeCamera = new THREE.PerspectiveCamera(70, 1, 0.1, 200);
   threeCamera.rotation.order = "YXZ";
 
-  threeScene.add(new THREE.AmbientLight(0xffffff, 0.7));
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.55);
-  dirLight.position.set(4, 10, 4);
-  threeScene.add(dirLight);
+  threeAmbientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  threeScene.add(threeAmbientLight);
+  threeDirLight = new THREE.DirectionalLight(0xffffff, 0.55);
+  threeDirLight.position.set(4, 10, 4);
+  threeScene.add(threeDirLight);
 
   resizeThree();
   window.addEventListener("resize", resizeThree);
+}
+
+// 현재 적용된 테마 색상을 배경/조명에 반영합니다.
+function applyThemeToScene(){
+  const theme = getActiveTheme();
+  if(threeScene) threeScene.background = new THREE.Color(theme.bg);
+  if(threeAmbientLight){
+    threeAmbientLight.color.setHex(theme.ambient);
+    threeAmbientLight.intensity = theme.ambientI;
+  }
+  if(threeDirLight){
+    threeDirLight.color.setHex(theme.dir);
+    threeDirLight.intensity = theme.dirI;
+  }
 }
 
 function resizeThree(){
@@ -1773,53 +2170,237 @@ function buildGalleryScene(){
   threeGalleryGroup = new THREE.Group();
   interactiveMeshes = [];
 
-  const artworks = getVisibleArtworks().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
-  const spacing = 5;
-  roomLength = Math.max(20, 4 + Math.ceil(Math.max(artworks.length,1)/2) * spacing + 4);
+  const theme = getActiveTheme();
+  applyThemeToScene();
 
-  // 바닥
+  const layoutId = cachedGalleryLayout || "corridor";
+  const layout = getActiveLayout();
+  const floorCount = getActiveFloorCount();
+
+  const allArtworks = getVisibleArtworks().sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  // 2층이면 작품을 절반씩 나눠서 배치, 1층이면 전부 1층에 배치
+  const floorArtworkLists = floorCount === 2
+    ? [ allArtworks.slice(0, Math.ceil(allArtworks.length/2)), allArtworks.slice(Math.ceil(allArtworks.length/2)) ]
+    : [ allArtworks ];
+
+  if(layoutId === "custom"){
+    // 관리자가 직접 칠한 격자대로 벽을 세움
+    const grid = getActiveGridArray();
+    currentCollisionGrid = grid;
+    activeStairZone = {
+      xMin: gridCellWorldX(ENTRY_COL) - (CELL_SIZE/2 - 0.15),
+      xMax: gridCellWorldX(ENTRY_COL) + (CELL_SIZE/2 - 0.15),
+      zMin: gridCellWorldZ(ENTRY_ROW) - (CELL_SIZE/2 - 0.15),
+      zMax: gridCellWorldZ(ENTRY_ROW) + (CELL_SIZE/2 - 0.15)
+    };
+
+    floorArtworkLists.forEach((list, floorIdx)=>{
+      const yOffset = floorIdx * FLOOR_GAP;
+      const isTopFloor = floorIdx === floorCount - 1;
+      buildCustomGridShell(threeGalleryGroup, theme, grid, yOffset, !isTopFloor);
+      placeFramesGrid(threeGalleryGroup, list, theme, yOffset, grid);
+    });
+  }else{
+    // 정해진 틀(복도형/사각형 홀형) 구조
+    currentCollisionGrid = null;
+    activeStairZone = { xMin: STAIR_X_MIN, xMax: STAIR_X_MAX, zMin: STAIR_Z_MIN, zMax: STAIR_Z_MAX };
+    const hw = layout.halfWidth;
+
+    // 두 층의 길이를 같게 맞춰서 계단 위치 계산이 단순해지도록 함
+    roomLength = 20;
+    floorArtworkLists.forEach(list=>{
+      const need = (layoutId === "hall")
+        ? Math.max(16, 8 + Math.ceil(Math.max(list.length,1)/3) * 3)
+        : Math.max(20, 4 + Math.ceil(Math.max(list.length,1)/2) * 5 + 4);
+      roomLength = Math.max(roomLength, need);
+    });
+
+    floorArtworkLists.forEach((list, floorIdx)=>{
+      const yOffset = floorIdx * FLOOR_GAP;
+      const isTopFloor = floorIdx === floorCount - 1;
+      buildRoomShell(threeGalleryGroup, theme, hw, roomLength, yOffset, !isTopFloor);
+      if(layoutId === "hall"){
+        placeFramesHall(threeGalleryGroup, list, theme, yOffset, hw, roomLength);
+      }else{
+        placeFramesCorridor(threeGalleryGroup, list, theme, yOffset, hw);
+      }
+    });
+  }
+
+  // 2층일 때만 계단(경사로) 추가
+  if(floorCount === 2 && activeStairZone){
+    buildStaircase(threeGalleryGroup, theme, activeStairZone);
+  }
+
+  threeScene.add(threeGalleryGroup);
+}
+
+// "직접 설계(격자)" 구조의 바닥/천장/벽을 격자 데이터 그대로 생성
+function buildCustomGridShell(group, theme, grid, yOffset, skipCeiling){
+  const widthX = GRID_COLS * CELL_SIZE;
+  const depthZ = GRID_ROWS * CELL_SIZE;
+  const centerZ = (GRID_ROWS - 1) * CELL_SIZE / 2;
+
   const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROOM_HALF_WIDTH*2, roomLength),
-    new THREE.MeshStandardMaterial({color:0xD8CBB0})
+    new THREE.PlaneGeometry(widthX, depthZ),
+    new THREE.MeshStandardMaterial({color:theme.floor})
   );
   floor.rotation.x = -Math.PI/2;
-  floor.position.set(0, 0, roomLength/2 - 2);
-  threeGalleryGroup.add(floor);
+  floor.position.set(0, yOffset, centerZ);
+  group.add(floor);
 
-  // 천장
-  const ceiling = new THREE.Mesh(
-    new THREE.PlaneGeometry(ROOM_HALF_WIDTH*2, roomLength),
-    new THREE.MeshStandardMaterial({color:0xF3EEE2})
+  if(!skipCeiling){
+    const ceiling = new THREE.Mesh(
+      new THREE.PlaneGeometry(widthX, depthZ),
+      new THREE.MeshStandardMaterial({color:theme.ceiling})
+    );
+    ceiling.rotation.x = Math.PI/2;
+    ceiling.position.set(0, yOffset + WALL_HEIGHT, centerZ);
+    group.add(ceiling);
+  }
+
+  const wallMat = new THREE.MeshStandardMaterial({color:theme.wall});
+  for(let r=0; r<GRID_ROWS; r++){
+    for(let c=0; c<GRID_COLS; c++){
+      if(grid[r][c] === 1){
+        const box = new THREE.Mesh(new THREE.BoxGeometry(CELL_SIZE, WALL_HEIGHT, CELL_SIZE), wallMat);
+        box.position.set(gridCellWorldX(c), yOffset + WALL_HEIGHT/2, gridCellWorldZ(r));
+        group.add(box);
+      }
+    }
+  }
+}
+
+// 격자 벽 중 옆이 빈 칸(걸어 다닐 수 있는 칸)인 면을 찾아 그 면에 작품을 겁니다.
+function placeFramesGrid(group, artworks, theme, yOffset, grid){
+  const faces = [];
+  for(let r=0; r<GRID_ROWS; r++){
+    for(let c=0; c<GRID_COLS; c++){
+      if(grid[r][c] !== 1) continue;
+      const candidates = [
+        {nr:r-1, nc:c,   rotY:Math.PI,    dx:0, dz:-(CELL_SIZE/2-0.12)},
+        {nr:r+1, nc:c,   rotY:0,          dx:0, dz: (CELL_SIZE/2-0.12)},
+        {nr:r,   nc:c-1, rotY:-Math.PI/2, dx:-(CELL_SIZE/2-0.12), dz:0},
+        {nr:r,   nc:c+1, rotY: Math.PI/2, dx: (CELL_SIZE/2-0.12), dz:0}
+      ];
+      candidates.forEach(cand=>{
+        if(cand.nr<0 || cand.nr>=GRID_ROWS || cand.nc<0 || cand.nc>=GRID_COLS) return;
+        if(grid[cand.nr][cand.nc] === 0){
+          faces.push({
+            x: gridCellWorldX(c) + cand.dx,
+            z: gridCellWorldZ(r) + cand.dz,
+            rotY: cand.rotY
+          });
+        }
+      });
+    }
+  }
+
+  if(faces.length === 0 || artworks.length === 0) return;
+
+  // 작품보다 걸 수 있는 면이 더 많으면, 한쪽에 몰리지 않도록 고르게 골라서 배치
+  let chosen;
+  if(faces.length <= artworks.length){
+    chosen = faces;
+  }else{
+    chosen = [];
+    const step = faces.length / artworks.length;
+    for(let i=0; i<artworks.length; i++){
+      chosen.push(faces[Math.floor(i*step)]);
+    }
+  }
+  chosen.forEach((f, i)=>{
+    if(!artworks[i]) return;
+    group.add(createFrameMesh(artworks[i], f.x, yOffset+1.75, f.z, f.rotY, theme.frame));
+  });
+}
+
+// 바닥/벽 + (최상층이 아니면) 천장을 만듦. skipCeiling이 true면 위층 바닥이 천장 역할을 대신함.
+function buildRoomShell(group, theme, hw, roomLen, yOffset, skipCeiling){
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(hw*2, roomLen),
+    new THREE.MeshStandardMaterial({color:theme.floor})
   );
-  ceiling.rotation.x = Math.PI/2;
-  ceiling.position.set(0, 3.4, roomLength/2 - 2);
-  threeGalleryGroup.add(ceiling);
+  floor.rotation.x = -Math.PI/2;
+  floor.position.set(0, yOffset, roomLen/2 - 2);
+  group.add(floor);
 
-  // 벽 4면
-  const wallMat = new THREE.MeshStandardMaterial({color:0xEDE6D6});
-  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, roomLength), wallMat);
-  leftWall.position.set(-ROOM_HALF_WIDTH, 1.7, roomLength/2 - 2);
-  threeGalleryGroup.add(leftWall);
-  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, 3.4, roomLength), wallMat);
-  rightWall.position.set(ROOM_HALF_WIDTH, 1.7, roomLength/2 - 2);
-  threeGalleryGroup.add(rightWall);
-  const backWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_HALF_WIDTH*2, 3.4, 0.2), wallMat);
-  backWall.position.set(0, 1.7, roomLength - 2);
-  threeGalleryGroup.add(backWall);
-  const frontWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_HALF_WIDTH*2, 3.4, 0.2), wallMat);
-  frontWall.position.set(0, 1.7, -2);
-  threeGalleryGroup.add(frontWall);
+  if(!skipCeiling){
+    const ceiling = new THREE.Mesh(
+      new THREE.PlaneGeometry(hw*2, roomLen),
+      new THREE.MeshStandardMaterial({color:theme.ceiling})
+    );
+    ceiling.rotation.x = Math.PI/2;
+    ceiling.position.set(0, yOffset + WALL_HEIGHT, roomLen/2 - 2);
+    group.add(ceiling);
+  }
 
-  // 작품 액자 (좌/우 벽에 번갈아 배치)
+  const wallMat = new THREE.MeshStandardMaterial({color:theme.wall});
+  const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, roomLen), wallMat);
+  leftWall.position.set(-hw, yOffset + WALL_HEIGHT/2, roomLen/2 - 2);
+  group.add(leftWall);
+  const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, roomLen), wallMat);
+  rightWall.position.set(hw, yOffset + WALL_HEIGHT/2, roomLen/2 - 2);
+  group.add(rightWall);
+  const backWall = new THREE.Mesh(new THREE.BoxGeometry(hw*2, WALL_HEIGHT, 0.2), wallMat);
+  backWall.position.set(0, yOffset + WALL_HEIGHT/2, roomLen - 2);
+  group.add(backWall);
+  const frontWall = new THREE.Mesh(new THREE.BoxGeometry(hw*2, WALL_HEIGHT, 0.2), wallMat);
+  frontWall.position.set(0, yOffset + WALL_HEIGHT/2, -2);
+  group.add(frontWall);
+}
+
+// 복도형: 좌/우 벽에 번갈아 배치
+function placeFramesCorridor(group, artworks, theme, yOffset, hw){
+  const spacing = 5;
   artworks.forEach((art, i)=>{
     const side = i % 2 === 0 ? -1 : 1;
     const z = 4 + Math.floor(i/2) * spacing;
-    const x = side * (ROOM_HALF_WIDTH - 0.1);
+    const x = side * (hw - 0.1);
     const rotY = side === -1 ? Math.PI/2 : -Math.PI/2;
-    threeGalleryGroup.add(createFrameMesh(art, x, z, rotY));
+    group.add(createFrameMesh(art, x, yOffset + 1.75, z, rotY, theme.frame));
   });
+}
 
-  threeScene.add(threeGalleryGroup);
+// 사각형 홀형: 입구(앞벽)를 비우고 좌/뒤/우 3개 벽 둘레를 따라 균등 배치
+function placeFramesHall(group, artworks, theme, yOffset, hw, roomLen){
+  const buckets = [[], [], []]; // 0:왼쪽벽, 1:뒤쪽벽, 2:오른쪽벽
+  artworks.forEach((art, i)=> buckets[i % 3].push(art));
+
+  buckets[0].forEach((art, idx)=>{
+    const z = 3 + (idx+1) * ((roomLen-6) / (buckets[0].length+1));
+    group.add(createFrameMesh(art, -(hw-0.1), yOffset+1.75, z, Math.PI/2, theme.frame));
+  });
+  buckets[2].forEach((art, idx)=>{
+    const z = 3 + (idx+1) * ((roomLen-6) / (buckets[2].length+1));
+    group.add(createFrameMesh(art, (hw-0.1), yOffset+1.75, z, -Math.PI/2, theme.frame));
+  });
+  buckets[1].forEach((art, idx)=>{
+    const x = -(hw-1) + (idx+1) * ((hw*2-2) / (buckets[1].length+1));
+    group.add(createFrameMesh(art, x, yOffset+1.75, roomLen-2-0.1, Math.PI, theme.frame));
+  });
+}
+
+// 입구 중앙에 1층→2층으로 걸어 올라가는 경사로(계단) 추가
+function buildStaircase(group, theme, zone){
+  const stepCount = 10;
+  const totalLen = zone.zMax - zone.zMin;
+  const stepDepth = totalLen / stepCount;
+  const stepWidth = zone.xMax - zone.xMin;
+  const stairMat = new THREE.MeshStandardMaterial({color: theme.frame});
+  for(let i=0; i<stepCount; i++){
+    const stepHeight = FLOOR_GAP * ((i+1)/stepCount);
+    const step = new THREE.Mesh(
+      new THREE.BoxGeometry(stepWidth, stepHeight, stepDepth),
+      stairMat
+    );
+    step.position.set(
+      (zone.xMin+zone.xMax)/2,
+      stepHeight/2,
+      zone.zMin + stepDepth*i + stepDepth/2
+    );
+    group.add(step);
+  }
 }
 
 function disposeGroup(group){
@@ -1832,13 +2413,13 @@ function disposeGroup(group){
   });
 }
 
-function createFrameMesh(art, x, z, rotY){
+function createFrameMesh(art, x, y, z, rotY, frameColor){
   const group = new THREE.Group();
   const dims = getFrameDims(art);
 
   const frameMesh = new THREE.Mesh(
     new THREE.BoxGeometry(dims.w + 0.3, dims.h + 0.3, 0.12),
-    new THREE.MeshStandardMaterial({color:0x9C7A3F})
+    new THREE.MeshStandardMaterial({color: frameColor != null ? frameColor : 0x9C7A3F})
   );
   group.add(frameMesh);
 
@@ -1856,7 +2437,7 @@ function createFrameMesh(art, x, z, rotY){
   plaqueMesh.position.set(0, -(dims.h/2 + 0.35), 0.07);
   group.add(plaqueMesh);
 
-  group.position.set(x, 1.75, z);
+  group.position.set(x, y, z);
   group.rotation.y = rotY;
 
   interactiveMeshes.push({mesh: artMesh, id: art.id});
@@ -2061,12 +2642,33 @@ function updateMovement(delta){
   const len = Math.hypot(mx, mz);
   if(len > 0){
     mx /= len; mz /= len;
-    playerPos.x += mx * speed;
-    playerPos.z += mz * speed;
-    playerPos.x = Math.max(-ROOM_HALF_WIDTH + 0.6, Math.min(ROOM_HALF_WIDTH - 0.6, playerPos.x));
-    playerPos.z = Math.max(-1.6, Math.min(roomLength - 2.4, playerPos.z));
+    const stepX = mx * speed, stepZ = mz * speed;
+
+    if(currentCollisionGrid){
+      // "직접 설계" 구조: 벽 칸으로는 못 들어가고, 벽을 따라 미끄러지듯 이동 (x/z 따로 검사)
+      const tryX = playerPos.x + stepX;
+      if(!isWallAtWorld(currentCollisionGrid, tryX, playerPos.z)) playerPos.x = tryX;
+      const tryZ = playerPos.z + stepZ;
+      if(!isWallAtWorld(currentCollisionGrid, playerPos.x, tryZ)) playerPos.z = tryZ;
+    }else{
+      playerPos.x += stepX;
+      playerPos.z += stepZ;
+      const hw = getActiveLayout().halfWidth || ROOM_HALF_WIDTH;
+      playerPos.x = Math.max(-hw + 0.6, Math.min(hw - 0.6, playerPos.x));
+      playerPos.z = Math.max(-1.6, Math.min(roomLength - 2.4, playerPos.z));
+    }
   }
-  threeCamera.position.set(playerPos.x, 1.6, playerPos.z);
+
+  // 계단(경사로) 구간 안에 있으면 z 위치에 따라 눈높이를 부드럽게 바꿔줌 (2층일 때만 의미 있음)
+  if(getActiveFloorCount() === 2 && activeStairZone &&
+     playerPos.x >= activeStairZone.xMin && playerPos.x <= activeStairZone.xMax &&
+     playerPos.z >= activeStairZone.zMin && playerPos.z <= activeStairZone.zMax){
+    const t = (playerPos.z - activeStairZone.zMin) / (activeStairZone.zMax - activeStairZone.zMin);
+    playerPos.y = 1.6 + t * FLOOR_GAP;
+  }
+  // 계단 구간 밖에서는 마지막 높이를 그대로 유지 (1층 또는 2층 바닥에 서 있는 상태)
+
+  threeCamera.position.set(playerPos.x, playerPos.y, playerPos.z);
 }
 
 function renderLoop(){
