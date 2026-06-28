@@ -575,6 +575,8 @@ button{font-family:inherit; cursor:pointer;}
       <label style="font-size:0.85rem; font-weight:700; color:var(--ink-soft); display:block; margin-bottom:6px;">🧱 직접 설계: 벽 칠하기</label>
       <p style="font-size:0.78rem; color:var(--ink-soft); margin:0 0 10px;">칸을 누르거나 마우스/손가락으로 쓸어가며 벽으로 칠할 수 있어요. 어두운 칸은 항상 외벽, 초록 칸은 입구라서 칠할 수 없어요. "저장하고 적용하기"를 누르면 "직접 설계" 구조로 바로 바뀌어요.</p>
       <div id="grid-editor-wrap" class="grid-editor-wrap"></div>
+      <div id="grid-slot-info" style="font-size:0.82rem; margin-top:10px; font-weight:700;"></div>
+      <p style="font-size:0.76rem; color:var(--ink-soft); margin:4px 0 0;">💡 벽을 너무 두껍게(여러 칸 겹쳐서) 칠하면 작품을 걸 자리가 줄어들어요. 벽 한 줄(1칸 두께)로 길을 만들면 양쪽 면 모두에 작품을 걸 수 있어 자리가 더 많아져요.</p>
       <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
         <button class="btn btn-primary btn-small" onclick="saveGridLayout()">저장하고 적용하기</button>
         <button class="btn btn-ghost btn-small" onclick="clearGridLayoutDraft()">벽 모두 지우기(초안)</button>
@@ -1581,6 +1583,26 @@ function renderGridEditor(){
   }
   box.innerHTML = html;
   bindGridEditorEvents();
+  updateGridSlotInfo();
+}
+
+// 지금 칠한 디자인으로 작품을 몇 개나 걸 수 있는지 실시간으로 보여줌
+function updateGridSlotInfo(){
+  const info = document.getElementById("grid-slot-info");
+  if(!info) return;
+  ensureWorkingGrid();
+  const slotCount = collectGridFaces(workingGrid).length;
+  const artCount = getArtworksArray().length;
+  if(slotCount === 0){
+    info.style.color = "var(--brick-dark)";
+    info.textContent = `⚠️ 지금 디자인으로는 작품을 걸 자리가 없어요! (자리 0개) 벽을 더 얇게 칠해보세요.`;
+  }else if(slotCount < artCount){
+    info.style.color = "var(--brick-dark)";
+    info.textContent = `⚠️ 걸 수 있는 자리: ${slotCount}개 / 등록된 작품: ${artCount}개 — 자리가 부족해서 일부 작품은 안 보일 수 있어요.`;
+  }else{
+    info.style.color = "var(--moss)";
+    info.textContent = `✅ 걸 수 있는 자리: ${slotCount}개 / 등록된 작품: ${artCount}개`;
+  }
 }
 
 function updateGridCellVisual(r, c){
@@ -1588,6 +1610,7 @@ function updateGridCellVisual(r, c){
   if(!box) return;
   const el = box.querySelector(`[data-row="${r}"][data-col="${c}"]`);
   if(el) el.className = "grid-cell " + gridCellClass(r, c, workingGrid[r][c]);
+  updateGridSlotInfo();
 }
 
 function bindGridEditorEvents(){
@@ -2012,6 +2035,8 @@ function getActiveFloorCount(){
 const STAIR_X_MIN = -1.0, STAIR_X_MAX = 1.0;
 const STAIR_Z_MIN = -1.7, STAIR_Z_MAX = -0.3;
 let currentCollisionGrid = null; // "직접 설계" 구조일 때만 사용하는 벽 충돌용 격자
+let activeSpotlightCount = 0;    // 이번 씬에서 지금까지 켠 실제 조명 개수
+const MAX_REAL_SPOTLIGHTS = 18;  // 화면이 무거워지지 않도록 실제 조명은 이 개수까지만 켬
 let activeStairZone = null;      // 지금 씬에서 실제로 쓰이는 계단 구간 (구조에 따라 달라짐)
 
 /* ---------------------------------------------------------
@@ -2183,6 +2208,7 @@ function buildGalleryScene(){
   }
   threeGalleryGroup = new THREE.Group();
   interactiveMeshes = [];
+  activeSpotlightCount = 0;
 
   const theme = getActiveTheme();
   applyThemeToScene();
@@ -2307,7 +2333,9 @@ function assignArtworksToSlots(artworks, slotCount){
   return result;
 }
 
-function placeFramesGrid(group, artworks, theme, yOffset, grid){
+// 격자에서 "작품을 걸 수 있는 면"(벽 칸 중 옆이 빈 칸인 면)을 모두 찾음.
+// placeFramesGrid(3D 배치)와 관리자 편집기(자리 개수 안내)가 함께 사용합니다.
+function collectGridFaces(grid){
   const faces = [];
   for(let r=0; r<GRID_ROWS; r++){
     for(let c=0; c<GRID_COLS; c++){
@@ -2330,7 +2358,11 @@ function placeFramesGrid(group, artworks, theme, yOffset, grid){
       });
     }
   }
+  return faces;
+}
 
+function placeFramesGrid(group, artworks, theme, yOffset, grid){
+  const faces = collectGridFaces(grid);
   if(faces.length === 0 || artworks.length === 0) return;
 
   // 작품보다 걸 수 있는 면이 더 많으면, 한쪽에 몰리지 않도록 고르게 골라서 슬롯으로 사용
@@ -2477,14 +2509,9 @@ function createFrameMesh(art, x, y, z, rotY, frameColor){
   const group = new THREE.Group();
   const dims = getFrameDims(art);
 
-  const frameMat = new THREE.MeshStandardMaterial({
-    color: frameColor != null ? frameColor : 0x9C7A3F,
-    emissive: 0x3A2A10,
-    emissiveIntensity: 0.35
-  });
   const frameMesh = new THREE.Mesh(
     new THREE.BoxGeometry(dims.w + 0.3, dims.h + 0.3, 0.12),
-    frameMat
+    new THREE.MeshStandardMaterial({color: frameColor != null ? frameColor : 0x9C7A3F})
   );
   group.add(frameMesh);
 
@@ -2502,23 +2529,26 @@ function createFrameMesh(art, x, y, z, rotY, frameColor){
   plaqueMesh.position.set(0, -(dims.h/2 + 0.35), 0.07);
   group.add(plaqueMesh);
 
-  // 작품 조명 효과: 실제 동적 조명 대신 "조명 기구" 장식 + 은은한 빛줄기(half-transparent 메쉬)로 표현
-  // → 작품이 많아져도 실시간 조명 개수 제한 문제로 화면이 깨지지 않도록 안전하게 처리
+  // 작품 조명: 천장 쪽에 작은 조명 기구를 달고, 그 자리에서 작품을 향해 비추는 실제 조명을 켭니다.
+  // (작품이 아주 많을 때는 일부만 실제 조명을 켜서 화면이 무거워지지 않게 합니다 - 기구 장식은 항상 보임)
+  const fixtureY = Math.min(dims.h/2 + 0.5, 1.55);
   const fixtureMesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.09, 0.16, 10),
-    new THREE.MeshStandardMaterial({color:0x2B2B2B})
+    new THREE.CylinderGeometry(0.07, 0.09, 0.12, 12),
+    new THREE.MeshStandardMaterial({color:0x222222})
   );
-  fixtureMesh.position.set(0, dims.h/2 + 0.42, 0.55);
-  fixtureMesh.rotation.x = Math.PI/2.6;
+  fixtureMesh.position.set(0, fixtureY, 0.5);
   group.add(fixtureMesh);
 
-  const beamMesh = new THREE.Mesh(
-    new THREE.ConeGeometry(Math.max(dims.w, dims.h) * 0.42, dims.h * 0.85, 16, 1, true),
-    new THREE.MeshBasicMaterial({color:0xFFF1CC, transparent:true, opacity:0.10, side:THREE.DoubleSide, depthWrite:false})
-  );
-  beamMesh.position.set(0, dims.h/2 + 0.1, 0.45);
-  beamMesh.rotation.x = Math.PI;
-  group.add(beamMesh);
+  if(activeSpotlightCount < MAX_REAL_SPOTLIGHTS){
+    activeSpotlightCount++;
+    const spotlight = new THREE.SpotLight(0xFFE9C7, 0.85, 5.5, Math.PI/6.5, 0.55, 1.6);
+    spotlight.position.set(0, fixtureY, 0.5);
+    const spotTarget = new THREE.Object3D();
+    spotTarget.position.set(0, -dims.h*0.15, 0.07);
+    group.add(spotTarget);
+    spotlight.target = spotTarget;
+    group.add(spotlight);
+  }
 
   group.position.set(x, y, z);
   group.rotation.y = rotY;
