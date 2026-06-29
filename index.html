@@ -3025,7 +3025,7 @@ function createFrameMesh(art, x, y, z, rotY, frameColor){
     const spotlight = new THREE.SpotLight(0xFFE9C7, 0.85, 5.5, Math.PI/6.5, 0.55, 1.6);
     spotlight.position.set(0, fixtureY, 0.5);
     const spotTarget = new THREE.Object3D();
-    spotTarget.position.set(0, -dims.h*0.15, 0.07);
+    spotTarget.position.set(0, 0, 0.07); // 사진 비율과 무관하게 항상 작품 중앙을 향하도록 고정
     group.add(spotTarget);
     spotlight.target = spotTarget;
     group.add(spotlight);
