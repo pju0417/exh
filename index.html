@@ -2476,6 +2476,7 @@ const HALL_HALF_WIDTH = 7.5;   // 사각형 홀형 전시실의 절반 너비
 const WALL_HEIGHT = 3.4;
 const FLOOR_GAP = 3.4;         // 1층 천장 ~ 2층 바닥까지의 높이 (2층일 때만 사용)
 let roomLength = 20;            // 전시실 한 층의 길이(작품 수에 따라 자동 계산)
+let activeRoomHalfWidth = ROOM_HALF_WIDTH; // 지금 씬에 실제로 적용된 방 너비(작품 수에 따라 넓어질 수 있음) - 이동 경계 계산에 사용
 let lastFrameTime = performance.now();
 
 // 전시장 구조(레이아웃)·층수 프리셋 - 정해진 틀 안에서만 선택 가능
@@ -2725,32 +2726,44 @@ function buildGalleryScene(){
       placeFramesGrid(threeGalleryGroup, list, theme, yOffset, grid);
     });
   }else{
-    // 정해진 틀(복도형/사각형 홀형) 구조
+    // 정해진 틀(복도형/사각형 홀형) 구조 - 두 구조 모두 4개 벽(좌/뒤/우/앞)에 고르게 작품을 나눠 겁니다.
     currentCollisionGrid = null;
     activeStairZone = { xMin: STAIR_X_MIN, xMax: STAIR_X_MAX, zMin: STAIR_Z_MIN, zMax: STAIR_Z_MAX };
-    const hw = layout.halfWidth;
 
-    // 두 층의 길이를 같게 맞춰서 계단 위치 계산이 단순해지도록 함
-    roomLength = 20;
-    floorArtworkLists.forEach(list=>{
-      const need = (layoutId === "hall")
-        ? Math.max(16, 8 + Math.ceil(Math.max(list.length,1)/3) * 3)
-        : Math.max(20, 4 + Math.ceil(Math.max(list.length,1)/2) * 5 + 4);
-      roomLength = Math.max(roomLength, need);
-    });
+    // 작품이 많거나 액자가 클수록 간격이 좁아져 겹치지 않도록, 가장 넓은 액자 너비를 기준으로
+    // "한 작품이 차지하는 최소 간격(footprint)"을 계산하고 방 크기에 반영합니다.
+    const maxFrameW = allArtworks.reduce((m, art)=> Math.max(m, getFrameDims(art).w), 0);
+    const footprint = Math.max(2.6, maxFrameW + 1.0); // 액자 너비 + 여유 간격(최소 2.6m 보장)
+    const n = Math.max(...floorArtworkLists.map(l=>l.length), 1);
+
+    const counts = computeRectBucketCounts(n); // [좌, 뒤, 우, 앞] 작품 수
+    const maxSideCount = Math.max(counts[0], counts[2]);
+    const maxEndCount = Math.max(counts[1], counts[3]);
+    const entranceGap = Math.max(2.6, footprint); // 입구/계단 공간 확보용 앞벽 중앙 여백
+
+    const baseHw = layout.halfWidth;
+    const roomLen = Math.max(20, footprint * (maxSideCount + 1) + 6);
+    // 앞/뒤 벽에 작품이 많이 몰리면, 벽 길이(너비)도 함께 넓혀서 겹치지 않게 합니다.
+    const hw = Math.max(baseHw, (footprint * maxEndCount + entranceGap) / 2 + 1);
+    roomLength = roomLen;
+    activeRoomHalfWidth = hw;
 
     floorArtworkLists.forEach((list, floorIdx)=>{
       const yOffset = floorIdx * FLOOR_GAP;
       buildRoomShell(threeGalleryGroup, theme, hw, roomLength, yOffset);
-      if(layoutId === "hall"){
-        placeFramesHall(threeGalleryGroup, list, theme, yOffset, hw, roomLength);
-      }else{
-        placeFramesCorridor(threeGalleryGroup, list, theme, yOffset, hw);
-      }
+      placeFramesRect(threeGalleryGroup, list, theme, yOffset, hw, roomLength, entranceGap);
     });
   }
 
   threeScene.add(threeGalleryGroup);
+}
+
+// 4개 벽(좌/뒤/우/앞)에 작품을 순서대로 나눠 담을 때의 개수를 계산
+// (placeFramesRect와 항상 같은 규칙을 써야 방 크기 계산과 실제 배치가 일치합니다)
+function computeRectBucketCounts(n){
+  const counts = [0, 0, 0, 0]; // 0:왼쪽벽, 1:뒤쪽벽, 2:오른쪽벽, 3:앞쪽벽(입구쪽, 중앙은 비움)
+  for(let i=0; i<n; i++) counts[i % 4]++;
+  return counts;
 }
 
 // "직접 설계(격자)" 구조의 바닥/천장/벽을 격자 데이터 그대로 생성
@@ -2899,36 +2912,22 @@ function buildRoomShell(group, theme, hw, roomLen, yOffset){
   group.add(frontWall);
 }
 
-// 복도형: 좌/우 벽에 번갈아 배치될 "자리" 목록을 만든 뒤, 수동 지정 번호가 있으면 그 자리에 고정
-function placeFramesCorridor(group, artworks, theme, yOffset, hw){
-  const spacing = 5;
+// 복도형/사각형 홀형 공용: 좌/뒤/우/앞 4개 벽에 작품을 고르게 나눠 걸음.
+// 앞벽(입구쪽)은 중앙에 입구·계단 공간을 남기고 양옆에만 작품을 건다.
+function placeFramesRect(group, artworks, theme, yOffset, hw, roomLen, entranceGap){
   const n = artworks.length;
-  const slots = [];
-  for(let i=0; i<n; i++){
-    const side = i % 2 === 0 ? -1 : 1;
-    const z = 4 + Math.floor(i/2) * spacing;
-    const x = side * (hw - 0.1);
-    const rotY = side === -1 ? Math.PI/2 : -Math.PI/2;
-    slots.push({x, z, rotY});
-  }
-  const assigned = assignArtworksToSlots(artworks, slots.length);
-  assigned.forEach((art, i)=>{
-    if(!art) return;
-    const s = slots[i];
-    group.add(createFrameMesh(art, s.x, yOffset + 1.75, s.z, s.rotY, theme.frame));
-  });
-}
+  const counts = computeRectBucketCounts(n); // [좌, 뒤, 우, 앞]
 
-// 사각형 홀형: 입구(앞벽)를 비우고 좌/뒤/우 3개 벽 둘레를 따라 자리를 만든 뒤 수동/자동 배정
-function placeFramesHall(group, artworks, theme, yOffset, hw, roomLen){
-  const n = artworks.length;
-  const counts = [0, 0, 0]; // 0:왼쪽벽, 1:뒤쪽벽, 2:오른쪽벽
-  for(let i=0; i<n; i++) counts[i % 3]++;
+  const halfHw = hw - 1;
+  const leftSegStart = -halfHw, leftSegEnd = -entranceGap/2;
+  const rightSegStart = entranceGap/2, rightSegEnd = halfHw;
+  const frontCountLeftHalf = Math.ceil(counts[3]/2);
+  const frontCountRightHalf = counts[3] - frontCountLeftHalf;
 
   const slots = new Array(n);
-  let idxLeft = 0, idxBack = 0, idxRight = 0;
+  let idxLeft = 0, idxBack = 0, idxRight = 0, idxFrontLeft = 0, idxFrontRight = 0;
   for(let i=0; i<n; i++){
-    const bucket = i % 3;
+    const bucket = i % 4;
     if(bucket === 0){
       const z = 3 + (idxLeft+1) * ((roomLen-6) / (counts[0]+1));
       slots[i] = { x:-(hw-0.1), z, rotY:Math.PI/2 };
@@ -2937,10 +2936,21 @@ function placeFramesHall(group, artworks, theme, yOffset, hw, roomLen){
       const z = 3 + (idxRight+1) * ((roomLen-6) / (counts[2]+1));
       slots[i] = { x:(hw-0.1), z, rotY:-Math.PI/2 };
       idxRight++;
-    }else{
+    }else if(bucket === 1){
       const x = -(hw-1) + (idxBack+1) * ((hw*2-2) / (counts[1]+1));
       slots[i] = { x, z: roomLen-2-0.1, rotY: Math.PI };
       idxBack++;
+    }else{
+      // 앞쪽 벽: 중앙(입구/계단)을 비우고 양옆에 절반씩 나눠서 배치
+      let x;
+      if(idxFrontLeft < frontCountLeftHalf){
+        x = leftSegStart + (idxFrontLeft+1) * ((leftSegEnd-leftSegStart) / (frontCountLeftHalf+1));
+        idxFrontLeft++;
+      }else{
+        x = rightSegStart + (idxFrontRight+1) * ((rightSegEnd-rightSegStart) / (frontCountRightHalf+1));
+        idxFrontRight++;
+      }
+      slots[i] = { x, z: -2+0.1, rotY: 0 };
     }
   }
 
@@ -3247,7 +3257,7 @@ function updateMovement(delta){
     }else{
       playerPos.x += stepX;
       playerPos.z += stepZ;
-      const hw = getActiveLayout().halfWidth || ROOM_HALF_WIDTH;
+      const hw = activeRoomHalfWidth || ROOM_HALF_WIDTH;
       playerPos.x = Math.max(-hw + 0.6, Math.min(hw - 0.6, playerPos.x));
       playerPos.z = Math.max(-1.6, Math.min(roomLength - 2.4, playerPos.z));
     }
